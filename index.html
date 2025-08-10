@@ -1,58 +1,180 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>City Boundary + 48 Mile Buffer - Accurate</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>City Boundary with Autocomplete & Locate Me + Radius</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
 
-  <style>
-    html, body { height: 100%; margin: 0; }
-    #map { height: 100%; width: 100%; }
-    #searchBox {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      background: white;
-      padding: 6px 10px;
-      border-radius: 5px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      font-family: sans-serif;
-    }
-    #searchBox input[type="text"] {
-      width: 250px;
-      padding: 5px 8px;
-      font-size: 14px;
-    }
-    #searchBox button {
-      padding: 5px 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-  </style>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  #map {
+    height: 100%;
+    width: 100%;
+  }
+  #searchBox {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: white;
+    padding: 6px 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    font-family: sans-serif;
+    width: 360px;
+  }
+  #cityInput {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+  #controls {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  #radiusInput {
+    width: 70px;
+    padding: 6px 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+  #unitsSelect {
+    padding: 6px 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+  #gpsBtn {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #suggestions {
+    border: 1px solid #ccc;
+    max-height: 180px;
+    overflow-y: auto;
+    background: white;
+    position: absolute;
+    top: 42px;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 0 0 5px 5px;
+    display: none;
+    z-index: 1100;
+  }
+  #suggestions div {
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  #suggestions div:hover {
+    background: #eee;
+  }
+
+  /* Legend box styling */
+  #legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1500;
+    background: white;
+    padding: 10px 14px;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.2);
+    font-family: sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #333;
+    width: 200px;
+  }
+  #legend h4 {
+    margin: 0 0 6px 0;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  #legend .legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  #legend .color-box {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    border-radius: 3px;
+  }
+  #legend .boundary {
+    background: #2a7;
+  }
+  #legend .buffer {
+    background: #d30;
+  }
+
+</style>
 </head>
 <body>
-
   <div id="searchBox">
-    <input type="text" id="cityInput" placeholder="Enter city name (e.g. Bradford)" />
-    <button id="searchBtn">Search</button>
+    <input
+      type="text"
+      id="cityInput"
+      placeholder="Start typing city name..."
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <div id="suggestions"></div>
+
+    <div id="controls">
+      <input
+        type="number"
+        id="radiusInput"
+        min="1"
+        max="100"
+        value="48"
+        title="Radius"
+      />
+      <select id="unitsSelect" title="Select units">
+        <option value="miles" selected>Miles</option>
+        <option value="kilometers">Kilometers</option>
+      </select>
+      <button id="gpsBtn" title="Use GPS to detect city">📍 Locate Me</button>
+    </div>
   </div>
+
   <div id="map"></div>
+
+  <!-- Legend box -->
+  <div id="legend">
+    <h4>Legend</h4>
+    <div class="legend-item">
+      <div class="color-box boundary"></div>
+      <span>City Boundary</span>
+    </div>
+    <div class="legend-item">
+      <div class="color-box buffer"></div>
+      <span>Buffer Zone</span>
+    </div>
+  </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Turf.js -->
+  <!-- Turf.js for buffering -->
   <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-  <!-- osmtogeojson v2.1.0 -->
+  <!-- osmtogeojson -->
   <script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
   <script>
-    const BUFFER_MILES = 48;
-
     const map = L.map('map').setView([53.795, -1.759], 10);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -70,90 +192,218 @@
 
     const markerLayer = L.layerGroup().addTo(map);
 
-    async function fetchCityBoundary(cityName) {
-      const query = `
-[out:json][timeout:25];
-relation
-  ["boundary"="administrative"]
-  ["admin_level"="8"]
-  ["name"="${cityName}"];
-out body;
->;
-out skel qt;
-      `;
+    const cityInput = document.getElementById('cityInput');
+    const suggestions = document.getElementById('suggestions');
+    const gpsBtn = document.getElementById('gpsBtn');
+    const radiusInput = document.getElementById('radiusInput');
+    const unitsSelect = document.getElementById('unitsSelect');
+    const searchBox = document.getElementById('searchBox');
 
-      const url = 'https://overpass-api.de/api/interpreter';
+    let debounceTimeout = null;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        body: new URLSearchParams({ data: query })
-      });
-
-      if (!response.ok) throw new Error(`Overpass API error: ${response.statusText}`);
-
-      const data = await response.json();
-
-      const geojson = osmtogeojson(data);
-
-      // Find polygon or multipolygon features only
-      const polygonFeatures = geojson.features.filter(f => f.geometry &&
-        (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-
-      if (polygonFeatures.length === 0) throw new Error(`No polygon boundary found for "${cityName}"`);
-
-      // Sometimes relations have multiple polygons, so combine all polygons into one feature collection
-      // For now, just create a feature collection of all polygon features
-      return {
-        type: "FeatureCollection",
-        features: polygonFeatures
-      };
-    }
-
-    function clearAll() {
+    function clearMap() {
       boundaryLayer.clearLayers();
       bufferLayer.clearLayers();
       markerLayer.clearLayers();
     }
 
-    async function drawCityBoundaryBuffer(cityName) {
-      clearAll();
+    async function fetchSuggestions(query) {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&accept-language=en&featuretype=city|town|village|county`;
+      const resp = await fetch(url, {headers: {'User-Agent': 'city-boundary-demo'}});
+      if (!resp.ok) throw new Error('Network response was not ok');
+      return resp.json();
+    }
+
+    async function fetchBoundaryByRelation(osmId) {
+      const query = `
+[out:json][timeout:25];
+relation(${osmId});
+out body;
+>;
+out skel qt;
+      `;
+      const url = 'https://overpass-api.de/api/interpreter';
+      const resp = await fetch(url, {
+        method: 'POST',
+        body: new URLSearchParams({ data: query }),
+      });
+      if (!resp.ok) throw new Error('Overpass API error');
+      const data = await resp.json();
+      return osmtogeojson(data);
+    }
+
+    // Draw boundary + buffer according to current radius and units
+    function drawBoundaryAndBuffer(polygons) {
+      clearMap();
+      boundaryLayer.addData(polygons);
+
+      const radius = parseFloat(radiusInput.value);
+      const units = unitsSelect.value;
+
+      if (isNaN(radius) || radius <= 0) {
+        alert('Please enter a valid radius greater than zero');
+        return;
+      }
 
       try {
-        const polygonFeatureCollection = await fetchCityBoundary(cityName);
-
-        boundaryLayer.addData(polygonFeatureCollection);
-
-        // Turf buffer expects Feature or FeatureCollection
-        const buffered = turf.buffer(polygonFeatureCollection, BUFFER_MILES, { units: 'miles' });
-
+        const buffered = turf.buffer({
+          type: "FeatureCollection",
+          features: polygons
+        }, radius, { units });
         bufferLayer.addData(buffered);
-
         map.fitBounds(bufferLayer.getBounds().pad(0.2));
-
-      } catch (err) {
-        alert(`Error: ${err.message}`);
-        console.error(err);
+      } catch (e) {
+        alert('Buffer error: ' + e.message);
       }
     }
 
-    document.getElementById('searchBtn').addEventListener('click', () => {
-      const city = document.getElementById('cityInput').value.trim();
-      if (!city) {
-        alert("Please enter a city name");
+    function showSuggestions(places) {
+      suggestions.innerHTML = '';
+      if (places.length === 0) {
+        suggestions.style.display = 'none';
         return;
       }
-      drawCityBoundaryBuffer(city);
+      places.forEach(place => {
+        const div = document.createElement('div');
+        div.textContent = place.display_name;
+        div.dataset.osmType = place.osm_type;
+        div.dataset.osmId = place.osm_id;
+        div.dataset.lat = place.lat;
+        div.dataset.lon = place.lon;
+        div.dataset.displayName = place.display_name;
+
+        div.addEventListener('click', async () => {
+          cityInput.value = place.display_name;
+          suggestions.style.display = 'none';
+
+          if (place.osm_type !== 'relation') {
+            alert('Selected place does not have a boundary polygon (not a relation).');
+            return;
+          }
+
+          try {
+            const geojson = await fetchBoundaryByRelation(place.osm_id);
+            const polygons = geojson.features.filter(f =>
+              f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+            if (polygons.length === 0) {
+              alert('No boundary polygon found for this place.');
+              return;
+            }
+            drawBoundaryAndBuffer(polygons);
+          } catch (e) {
+            alert('Failed to load boundary: ' + e.message);
+            console.error(e);
+          }
+        });
+        suggestions.appendChild(div);
+      });
+      suggestions.style.display = 'block';
+    }
+
+    cityInput.addEventListener('input', () => {
+      const val = cityInput.value.trim();
+      if (debounceTimeout) clearTimeout(debounceTimeout);
+      if (val.length < 3) {
+        suggestions.style.display = 'none';
+        return;
+      }
+      debounceTimeout = setTimeout(async () => {
+        try {
+          const results = await fetchSuggestions(val);
+          showSuggestions(results);
+        } catch (e) {
+          console.error(e);
+          suggestions.style.display = 'none';
+        }
+      }, 350);
     });
 
-    document.getElementById('cityInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        document.getElementById('searchBtn').click();
+    // Hide suggestions if click outside
+    document.addEventListener('click', (e) => {
+      if (!searchBox.contains(e.target)) {
+        suggestions.style.display = 'none';
       }
     });
 
-    // Load Bradford initially
-    drawCityBoundaryBuffer('Bradford');
-  </script>
+    // GPS locate me button
+    gpsBtn.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser');
+        return;
+      }
+      gpsBtn.disabled = true;
+      gpsBtn.textContent = 'Locating...';
 
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        try {
+          const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=en`;
+          const resp = await fetch(url, {headers: {'User-Agent': 'city-boundary-demo'}});
+          if (!resp.ok) throw new Error('Reverse geocoding failed');
+          const data = await resp.json();
+
+          if (!data || !data.address) {
+            alert('Unable to determine city from your location');
+            gpsBtn.disabled = false;
+            gpsBtn.textContent = '📍 Locate Me';
+            return;
+          }
+
+          // Prefer city, town, or county fields in address
+          let cityName = data.address.city || data.address.town || data.address.village || data.address.county;
+          if (!cityName) cityName = data.display_name;
+
+          cityInput.value = cityName;
+
+          // Find a relation that matches the city name (search again)
+          const searchResults = await fetchSuggestions(cityName);
+
+          // Try to find relation type
+          const cityRel = searchResults.find(p => p.osm_type === 'relation' && p.display_name.toLowerCase().includes(cityName.toLowerCase()));
+          if (!cityRel) {
+            alert('City boundary not found for your location');
+            gpsBtn.disabled = false;
+            gpsBtn.textContent = '📍 Locate Me';
+            return;
+          }
+
+          const geojson = await fetchBoundaryByRelation(cityRel.osm_id);
+          const polygons = geojson.features.filter(f =>
+            f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+          if (polygons.length === 0) {
+            alert('No boundary polygon found for your city');
+            gpsBtn.disabled = false;
+            gpsBtn.textContent = '📍 Locate Me';
+            return;
+          }
+          drawBoundaryAndBuffer(polygons);
+        } catch (e) {
+          alert('Failed to get city boundary: ' + e.message);
+          console.error(e);
+        } finally {
+          gpsBtn.disabled = false;
+          gpsBtn.textContent = '📍 Locate Me';
+        }
+      }, err => {
+        alert('Geolocation error: ' + err.message);
+        gpsBtn.disabled = false;
+        gpsBtn.textContent = '📍 Locate Me';
+      });
+    });
+
+    // Redraw buffer when radius or units change
+    radiusInput.addEventListener('change', () => {
+      if (boundaryLayer.getLayers().length) {
+        drawBoundaryAndBuffer(boundaryLayer.toGeoJSON().features);
+      }
+    });
+    unitsSelect.addEventListener('change', () => {
+      if (boundaryLayer.getLayers().length) {
+        drawBoundaryAndBuffer(boundaryLayer.toGeoJSON().features);
+      }
+    });
+  </script>
 </body>
 </html>
