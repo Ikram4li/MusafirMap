@@ -3,407 +3,499 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>City Boundary with Autocomplete & Locate Me + Radius</title>
+<title>Home & Destination Boundaries + Buffer & Overlap</title>
 
 <!-- Leaflet CSS -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-  html, body {
-    height: 100%;
-    margin: 0;
-  }
-  #map {
-    height: 100%;
-    width: 100%;
-  }
-  #searchBox {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: white;
-    padding: 6px 10px;
-    border-radius: 5px;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-    font-family: sans-serif;
-    width: 360px;
-  }
-  #cityInput {
-    width: 100%;
-    padding: 6px 8px;
-    font-size: 14px;
-    box-sizing: border-box;
-  }
-  #controls {
-    margin-top: 6px;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-  #radiusInput {
-    width: 70px;
-    padding: 6px 8px;
-    font-size: 14px;
-    box-sizing: border-box;
-  }
-  #unitsSelect {
-    padding: 6px 8px;
-    font-size: 14px;
-    box-sizing: border-box;
-  }
-  #gpsBtn {
-    flex: 1;
-    padding: 6px 10px;
-    font-size: 14px;
-    cursor: pointer;
-  }
-  #suggestions {
-    border: 1px solid #ccc;
-    max-height: 180px;
-    overflow-y: auto;
-    background: white;
-    position: absolute;
-    top: 42px;
-    width: 100%;
-    box-sizing: border-box;
-    border-radius: 0 0 5px 5px;
-    display: none;
-    z-index: 1100;
-  }
-  #suggestions div {
-    padding: 6px 8px;
-    cursor: pointer;
-  }
-  #suggestions div:hover {
-    background: #eee;
-  }
+  html, body { height: 100%; margin: 0; }
+  #map { height: 100%; width: 100%; }
 
-  /* Legend box styling */
+  #searchBar {
+    position: absolute;
+    top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; background: white; padding: 10px;
+    border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px;
+    width: min(900px, 94vw);
+  }
+  .field {
+    position: relative;
+  }
+  input[type="text"], input[type="number"], select, button {
+    width: 100%; padding: 8px 10px; font-size: 14px; box-sizing: border-box;
+    border: 1px solid #ccc; border-radius: 6px;
+  }
+  #suggestHome, #suggestDest {
+    position: absolute; left: 0; right: 0; top: calc(100% + 2px);
+    background: white; border: 1px solid #ccc; border-radius: 6px;
+    max-height: 220px; overflow-y: auto; display: none; z-index: 1100;
+  }
+  .suggestion {
+    padding: 8px 10px; cursor: pointer;
+  }
+  .suggestion:hover { background: #f2f2f2; }
+
   #legend {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1500;
-    background: white;
-    padding: 10px 14px;
-    border-radius: 6px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.2);
-    font-family: sans-serif;
-    font-size: 13px;
-    line-height: 1.4;
-    color: #333;
-    width: 200px;
+    position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+    background: white; padding: 10px 12px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 13px; line-height: 1.4;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    width: 230px;
   }
-  #legend h4 {
-    margin: 0 0 6px 0;
-    font-weight: 600;
-    font-size: 14px;
-  }
-  #legend .legend-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 6px;
-  }
-  #legend .color-box {
-    width: 18px;
-    height: 18px;
-    margin-right: 8px;
-    border-radius: 3px;
-  }
-  #legend .boundary {
-    background: #2a7;
-  }
-  #legend .buffer {
-    background: #d30;
-  }
-
+  #legend h4 { margin: 0 0 8px; font-size: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .color-box { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #0002; }
+  .home-boundary { background: #000; }
+  .home-buffer { background: #1e90ff; } /* blue */
+  .dest-outside { background: #2ecc71; } /* green */
+  .dest-inside { background: #e74c3c; }  /* red */
+  .point-note { font-size: 12px; color: #555; margin-top: 8px; }
 </style>
 </head>
 <body>
-  <div id="searchBox">
-    <input
-      type="text"
-      id="cityInput"
-      placeholder="Start typing city name..."
-      autocomplete="off"
-      spellcheck="false"
-    />
-    <div id="suggestions"></div>
 
-    <div id="controls">
-      <input
-        type="number"
-        id="radiusInput"
-        min="1"
-        max="100"
-        value="48"
-        title="Radius"
-      />
-      <select id="unitsSelect" title="Select units">
-        <option value="miles" selected>Miles</option>
-        <option value="kilometers">Kilometers</option>
-      </select>
-      <button id="gpsBtn" title="Use GPS to detect city">📍 Locate Me</button>
-    </div>
+<div id="searchBar">
+  <div class="field">
+    <input type="text" id="homeInput" placeholder="Home City / Address / Postcode" autocomplete="off" spellcheck="false" />
+    <div id="suggestHome"></div>
   </div>
-
-  <div id="map"></div>
-
-  <!-- Legend box -->
-  <div id="legend">
-    <h4>Legend</h4>
-    <div class="legend-item">
-      <div class="color-box boundary"></div>
-      <span>City Boundary</span>
-    </div>
-    <div class="legend-item">
-      <div class="color-box buffer"></div>
-      <span>Buffer Zone</span>
-    </div>
+  <div class="field">
+    <input type="text" id="destInput" placeholder="Destination City / Address / Postcode" autocomplete="off" spellcheck="false" />
+    <div id="suggestDest"></div>
   </div>
+  <div class="field" title="Buffer radius">
+    <input type="number" id="radiusInput" min="1" max="100" value="48" />
+  </div>
+  <div class="field" title="Units">
+    <select id="unitsSelect">
+      <option value="miles" selected>Miles</option>
+      <option value="kilometers">Kilometers</option>
+    </select>
+  </div>
+  <div style="grid-column: 1 / -1; display:flex; gap:8px;">
+    <button id="locateBtn" style="flex:0 0 auto; min-width:130px;">📍 Locate Me (Home)</button>
+  </div>
+</div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Turf.js for buffering -->
-  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-  <!-- osmtogeojson -->
-  <script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
+<div id="map"></div>
 
-  <script>
-    const map = L.map('map').setView([53.795, -1.759], 10);
+<div id="legend">
+  <h4>Legend</h4>
+  <div class="legend-item"><span class="color-box home-boundary"></span>Home City Boundary</div>
+  <div class="legend-item"><span class="color-box home-buffer"></span>Traveller’s Threshold (Ḥadd al-Safar)</div>
+  <div class="legend-item"><span class="color-box dest-inside"></span>Non Traveller</div>
+  <div class="legend-item"><span class="color-box dest-outside"></span>Traveller</div>
+  <div class="point-note">If a selected item lacks a polygon, a point+buffer is used.</div>
+</div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Turf.js -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<!-- Overpass JSON -> GeoJSON -->
+<script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
-    const boundaryLayer = L.geoJSON(null, {
-      style: { color: '#2a7', weight: 3, fillOpacity: 0.15 }
-    }).addTo(map);
+<script>
+  // ===== Map Setup =====
+  const map = L.map('map').setView([53.795, -1.759], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
-    const bufferLayer = L.geoJSON(null, {
-      style: { color: '#d30', weight: 3, fillOpacity: 0.1 }
-    }).addTo(map);
+  // ===== Layers =====
+  // Home
+  const homeBoundaryLayer = L.geoJSON(null, { style: { color: '#000', weight: 3, fillOpacity: 0.15 } }).addTo(map);
+  const homeBufferLayer   = L.geoJSON(null, { style: { color: '#1e90ff', weight: 3, fillOpacity: 0.10 } }).addTo(map);
+  const homeMarkerLayer   = L.layerGroup().addTo(map);
 
-    const markerLayer = L.layerGroup().addTo(map);
+  // Destination: split into outside (green) and inside (red) layers for clarity
+  const destOutsideLayer  = L.geoJSON(null, { style: { color: '#2ecc71', weight: 3, fillOpacity: 0.15 } }).addTo(map);
+  const destInsideLayer   = L.geoJSON(null, { style: { color: '#e74c3c', weight: 3, fillOpacity: 0.15 } }).addTo(map);
+  const destMarkerLayer   = L.layerGroup().addTo(map);
 
-    const cityInput = document.getElementById('cityInput');
-    const suggestions = document.getElementById('suggestions');
-    const gpsBtn = document.getElementById('gpsBtn');
-    const radiusInput = document.getElementById('radiusInput');
-    const unitsSelect = document.getElementById('unitsSelect');
-    const searchBox = document.getElementById('searchBox');
+  // ===== State (raw geometries to recalc buffers/overlaps) =====
+  let homeGeometry = null;   // GeoJSON Feature (Polygon/MultiPolygon) OR Point
+  let homeBuffer   = null;   // GeoJSON Feature (Polygon/MultiPolygon)
+  let destGeometry = null;   // GeoJSON Feature (Polygon/MultiPolygon) OR Point
 
-    let debounceTimeout = null;
+  const homeInput = document.getElementById('homeInput');
+  const destInput = document.getElementById('destInput');
+  const suggestHome = document.getElementById('suggestHome');
+  const suggestDest = document.getElementById('suggestDest');
+  const radiusInput = document.getElementById('radiusInput');
+  const unitsSelect = document.getElementById('unitsSelect');
+  const locateBtn   = document.getElementById('locateBtn');
 
-    function clearMap() {
-      boundaryLayer.clearLayers();
-      bufferLayer.clearLayers();
-      markerLayer.clearLayers();
-    }
+  let debounceH = null, debounceD = null;
 
-    async function fetchSuggestions(query) {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&accept-language=en&featuretype=city|town|village|county`;
-      const resp = await fetch(url, {headers: {'User-Agent': 'city-boundary-demo'}});
-      if (!resp.ok) throw new Error('Network response was not ok');
-      return resp.json();
-    }
+  // ===== Nominatim Search / Reverse =====
+  async function searchNominatim(q) {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&limit=7&accept-language=en`;
+    const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
+    if (!resp.ok) throw new Error('Search failed');
+    return resp.json();
+  }
 
-    async function fetchBoundaryByRelation(osmId) {
-      const query = `
+  async function reverseNominatim(lat, lon) {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=en`;
+    const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
+    if (!resp.ok) throw new Error('Reverse failed');
+    return resp.json();
+  }
+
+  // ===== Overpass: Fetch relation by explicit id (best) =====
+  async function fetchBoundaryByRelationId(osmId) {
+    const query = `
 [out:json][timeout:25];
 relation(${osmId});
 out body;
 >;
-out skel qt;
-      `;
-      const url = 'https://overpass-api.de/api/interpreter';
-      const resp = await fetch(url, {
-        method: 'POST',
-        body: new URLSearchParams({ data: query }),
-      });
-      if (!resp.ok) throw new Error('Overpass API error');
-      const data = await resp.json();
-      return osmtogeojson(data);
-    }
+out skel qt;`;
+    const url = 'https://overpass-api.de/api/interpreter';
+    const resp = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
+    if (!resp.ok) throw new Error('Overpass API error');
+    const data = await resp.json();
+    return osmtogeojson(data);
+  }
 
-    // Draw boundary + buffer according to current radius and units
-    function drawBoundaryAndBuffer(polygons) {
-      clearMap();
-      boundaryLayer.addData(polygons);
+  // ===== Overpass: Fallback by name (less precise, last resort) =====
+  async function fetchBoundaryByName(name) {
+    const query = `
+[out:json][timeout:25];
+relation["boundary"="administrative"]["name"="${name}"];
+out body;
+>;
+out skel qt;`;
+    const url = 'https://overpass-api.de/api/interpreter';
+    const resp = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
+    if (!resp.ok) throw new Error('Overpass API error');
+    const data = await resp.json();
+    return osmtogeojson(data);
+  }
 
-      const radius = parseFloat(radiusInput.value);
-      const units = unitsSelect.value;
+  // ===== Helpers =====
+  function clearHomeLayers() {
+    homeBoundaryLayer.clearLayers();
+    homeBufferLayer.clearLayers();
+    homeMarkerLayer.clearLayers();
+  }
+  function clearDestLayers() {
+    destOutsideLayer.clearLayers();
+    destInsideLayer.clearLayers();
+    destMarkerLayer.clearLayers();
+  }
 
-      if (isNaN(radius) || radius <= 0) {
-        alert('Please enter a valid radius greater than zero');
-        return;
-      }
+  function currentRadiusUnits() {
+    const radius = parseFloat(radiusInput.value);
+    const units  = unitsSelect.value;
+    if (isNaN(radius) || radius <= 0) throw new Error('Radius must be > 0');
+    return { radius, units };
+  }
 
+  function collectBounds() {
+    const groups = [];
+    if (homeBoundaryLayer.getLayers().length) groups.push(homeBoundaryLayer);
+    if (homeBufferLayer.getLayers().length)   groups.push(homeBufferLayer);
+    if (destOutsideLayer.getLayers().length)  groups.push(destOutsideLayer);
+    if (destInsideLayer.getLayers().length)   groups.push(destInsideLayer);
+    if (homeMarkerLayer.getLayers().length)   groups.push(homeMarkerLayer);
+    if (destMarkerLayer.getLayers().length)   groups.push(destMarkerLayer);
+    if (!groups.length) return null;
+    const fg = L.featureGroup(groups.flatMap(g => g.getLayers ? g.getLayers() : [g]));
+    return fg.getBounds();
+  }
+
+  function fitToData() {
+    const b = collectBounds();
+    if (b && b.isValid()) map.fitBounds(b.pad(0.2));
+  }
+
+  // Convert a Nominatim result to a "best city name" (for boundary search)
+  function extractCityName(addr) {
+    if (!addr) return null;
+    return addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
+  }
+
+  // Given a selected Nominatim place, resolve to:
+  // 1) a polygon/multipolygon boundary Feature (preferred), or
+  // 2) a point Feature (fallback)
+  async function resolveGeometryFromPlace(place) {
+    // If this is already a relation (city boundary), fetch by relation id
+    if (place.osm_type === 'relation') {
       try {
-        const buffered = turf.buffer({
-          type: "FeatureCollection",
-          features: polygons
-        }, radius, { units });
-        bufferLayer.addData(buffered);
-        map.fitBounds(bufferLayer.getBounds().pad(0.2));
+        const gj = await fetchBoundaryByRelationId(place.osm_id);
+        const polys = gj.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+        if (polys.length) return polys[0]; // Feature
+      } catch (e) { console.warn('Relation fetch failed:', e); }
+    }
+
+    // Else, try to get a city name from the address then fetch by name
+    const cityName = extractCityName(place.address);
+    if (cityName) {
+      try {
+        const gjByName = await fetchBoundaryByName(cityName);
+        const polys = gjByName.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+        if (polys.length) return polys[0];
+      } catch (e) { console.warn('Name-based boundary fetch failed:', e); }
+    }
+
+    // Fallback: point geometry
+    const lon = parseFloat(place.lon), lat = parseFloat(place.lat);
+    return turf.point([lon, lat]);
+  }
+
+  function isPolygonal(feature) {
+    return feature && feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
+  }
+
+  function drawHome(geom) {
+    clearHomeLayers();
+    homeGeometry = geom;
+
+    const { radius, units } = currentRadiusUnits();
+
+    if (isPolygonal(geom)) {
+      // Boundary
+      homeBoundaryLayer.addData(geom);
+      // Buffer
+      try {
+        homeBuffer = turf.buffer(geom, radius, { units });
+        homeBufferLayer.addData(homeBuffer);
       } catch (e) {
-        alert('Buffer error: ' + e.message);
+        alert('Buffer error (home): ' + e.message);
+        homeBuffer = null;
+      }
+    } else {
+      // Point fallback
+      const [lon, lat] = geom.geometry.coordinates;
+      homeMarkerLayer.addLayer(L.marker([lat, lon]));
+      try {
+        homeBuffer = turf.buffer(geom, radius, { units });
+        homeBufferLayer.addData(homeBuffer);
+      } catch (e) {
+        alert('Buffer error (home point): ' + e.message);
+        homeBuffer = null;
       }
     }
+    updateDestinationOverlap(); // recalc if destination already chosen
+    fitToData();
+  }
 
-    function showSuggestions(places) {
-      suggestions.innerHTML = '';
-      if (places.length === 0) {
-        suggestions.style.display = 'none';
-        return;
+  function drawDestination(geom) {
+    clearDestLayers();
+    destGeometry = geom;
+
+    // If no home buffer yet, just draw destination normally (green boundary/point buffer)
+    if (!homeBuffer) {
+      if (isPolygonal(geom)) {
+        destOutsideLayer.addData(geom); // show as green (outside layer is green-styled)
+      } else {
+        const { radius, units } = currentRadiusUnits();
+        const [lon, lat] = geom.geometry.coordinates;
+        destMarkerLayer.addLayer(L.marker([lat, lon]));
+        try {
+          const destBuf = turf.buffer(geom, radius, { units });
+          destOutsideLayer.addData(destBuf);
+        } catch (e) {
+          alert('Buffer error (destination point): ' + e.message);
+        }
       }
-      places.forEach(place => {
-        const div = document.createElement('div');
-        div.textContent = place.display_name;
-        div.dataset.osmType = place.osm_type;
-        div.dataset.osmId = place.osm_id;
-        div.dataset.lat = place.lat;
-        div.dataset.lon = place.lon;
-        div.dataset.displayName = place.display_name;
-
-        div.addEventListener('click', async () => {
-          cityInput.value = place.display_name;
-          suggestions.style.display = 'none';
-
-          if (place.osm_type !== 'relation') {
-            alert('Selected place does not have a boundary polygon (not a relation).');
-            return;
-          }
-
-          try {
-            const geojson = await fetchBoundaryByRelation(place.osm_id);
-            const polygons = geojson.features.filter(f =>
-              f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-            if (polygons.length === 0) {
-              alert('No boundary polygon found for this place.');
-              return;
-            }
-            drawBoundaryAndBuffer(polygons);
-          } catch (e) {
-            alert('Failed to load boundary: ' + e.message);
-            console.error(e);
-          }
-        });
-        suggestions.appendChild(div);
-      });
-      suggestions.style.display = 'block';
+      fitToData();
+      return;
     }
 
-    cityInput.addEventListener('input', () => {
-      const val = cityInput.value.trim();
-      if (debounceTimeout) clearTimeout(debounceTimeout);
-      if (val.length < 3) {
-        suggestions.style.display = 'none';
-        return;
-      }
-      debounceTimeout = setTimeout(async () => {
+    // If we have a home buffer, compute overlap for polygonal destination.
+    updateDestinationOverlap();
+    fitToData();
+  }
+
+  function updateDestinationOverlap() {
+    // Clear destination render, then re-render based on current state
+    destOutsideLayer.clearLayers();
+    destInsideLayer.clearLayers();
+    destMarkerLayer.clearLayers();
+
+    if (!destGeometry) return;
+
+    if (!homeBuffer) {
+      // no overlap logic possible
+      if (isPolygonal(destGeometry)) {
+        destOutsideLayer.addData(destGeometry);
+      } else {
+        const { radius, units } = currentRadiusUnits();
+        const [lon, lat] = destGeometry.geometry.coordinates;
+        destMarkerLayer.addLayer(L.marker([lat, lon]));
         try {
-          const results = await fetchSuggestions(val);
-          showSuggestions(results);
+          const destBuf = turf.buffer(destGeometry, radius, { units });
+          destOutsideLayer.addData(destBuf);
         } catch (e) {
-          console.error(e);
-          suggestions.style.display = 'none';
+          alert('Buffer error (destination point): ' + e.message);
         }
-      }, 350);
-    });
-
-    // Hide suggestions if click outside
-    document.addEventListener('click', (e) => {
-      if (!searchBox.contains(e.target)) {
-        suggestions.style.display = 'none';
       }
-    });
+      return;
+    }
 
-    // GPS locate me button
-    gpsBtn.addEventListener('click', () => {
-      if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser');
-        return;
+    // We have homeBuffer and a destination geometry
+    if (isPolygonal(destGeometry)) {
+      // Intersect destination with home buffer = red
+      try {
+        const inside = turf.intersect(destGeometry, homeBuffer);
+        if (inside) destInsideLayer.addData(inside);
+      } catch (e) {
+        console.warn('Intersect error:', e);
       }
-      gpsBtn.disabled = true;
-      gpsBtn.textContent = 'Locating...';
 
-      navigator.geolocation.getCurrentPosition(async pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-
+      // Destination outside home buffer = green (difference)
+      try {
+        const outside = turf.difference(destGeometry, homeBuffer);
+        if (outside) destOutsideLayer.addData(outside);
+        // If difference failed or null, but there was no intersection, show whole dest as outside
+        if (!outside && destInsideLayer.getLayers().length === 0) {
+          destOutsideLayer.addData(destGeometry);
+        }
+      } catch (e) {
+        console.warn('Difference error:', e);
+        // Fallback: if intersection drawn, also draw full dest as outside for visibility? No.
+        if (destInsideLayer.getLayers().length === 0) {
+          destOutsideLayer.addData(destGeometry);
+        }
+      }
+    } else {
+      // Destination is a point -> draw its buffer and split visually vs home buffer (point buffer vs home buffer)
+      const { radius, units } = currentRadiusUnits();
+      try {
+        const destBuf = turf.buffer(destGeometry, radius, { units });
+        // Red = intersection of destBuf with homeBuffer
+        let hadInside = false;
         try {
-          const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=en`;
-          const resp = await fetch(url, {headers: {'User-Agent': 'city-boundary-demo'}});
-          if (!resp.ok) throw new Error('Reverse geocoding failed');
-          const data = await resp.json();
-
-          if (!data || !data.address) {
-            alert('Unable to determine city from your location');
-            gpsBtn.disabled = false;
-            gpsBtn.textContent = '📍 Locate Me';
-            return;
-          }
-
-          // Prefer city, town, or county fields in address
-          let cityName = data.address.city || data.address.town || data.address.village || data.address.county;
-          if (!cityName) cityName = data.display_name;
-
-          cityInput.value = cityName;
-
-          // Find a relation that matches the city name (search again)
-          const searchResults = await fetchSuggestions(cityName);
-
-          // Try to find relation type
-          const cityRel = searchResults.find(p => p.osm_type === 'relation' && p.display_name.toLowerCase().includes(cityName.toLowerCase()));
-          if (!cityRel) {
-            alert('City boundary not found for your location');
-            gpsBtn.disabled = false;
-            gpsBtn.textContent = '📍 Locate Me';
-            return;
-          }
-
-          const geojson = await fetchBoundaryByRelation(cityRel.osm_id);
-          const polygons = geojson.features.filter(f =>
-            f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-          if (polygons.length === 0) {
-            alert('No boundary polygon found for your city');
-            gpsBtn.disabled = false;
-            gpsBtn.textContent = '📍 Locate Me';
-            return;
-          }
-          drawBoundaryAndBuffer(polygons);
+          const inside = turf.intersect(destBuf, homeBuffer);
+          if (inside) { destInsideLayer.addData(inside); hadInside = true; }
+        } catch (e) { console.warn('Point buffer intersect error:', e); }
+        // Green = difference (destBuf - homeBuffer)
+        try {
+          const outside = turf.difference(destBuf, homeBuffer);
+          if (outside) destOutsideLayer.addData(outside);
+          if (!outside && !hadInside) destOutsideLayer.addData(destBuf);
         } catch (e) {
-          alert('Failed to get city boundary: ' + e.message);
-          console.error(e);
-        } finally {
-          gpsBtn.disabled = false;
-          gpsBtn.textContent = '📍 Locate Me';
+          console.warn('Point buffer difference error:', e);
+          if (!hadInside) destOutsideLayer.addData(destBuf);
         }
-      }, err => {
-        alert('Geolocation error: ' + err.message);
-        gpsBtn.disabled = false;
-        gpsBtn.textContent = '📍 Locate Me';
+      } catch (e) {
+        alert('Buffer error (destination point): ' + e.message);
+      }
+    }
+  }
+
+  // ===== Suggestions UI =====
+  function renderSuggestions(container, places, onPick) {
+    container.innerHTML = '';
+    if (!places || !places.length) { container.style.display = 'none'; return; }
+    places.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'suggestion';
+      div.textContent = p.display_name;
+      div.addEventListener('click', async () => {
+        container.style.display = 'none';
+        try {
+          const geom = await resolveGeometryFromPlace(p);
+          onPick(geom);
+        } catch (e) {
+          alert('Failed to resolve selection: ' + e.message);
+          console.error(e);
+        }
       });
+      container.appendChild(div);
     });
+    container.style.display = 'block';
+  }
 
-    // Redraw buffer when radius or units change
-    radiusInput.addEventListener('change', () => {
-      if (boundaryLayer.getLayers().length) {
-        drawBoundaryAndBuffer(boundaryLayer.toGeoJSON().features);
+  // ===== Search Handlers (debounced) =====
+  homeInput.addEventListener('input', () => {
+    const q = homeInput.value.trim();
+    if (debounceH) clearTimeout(debounceH);
+    if (q.length < 3) { suggestHome.style.display = 'none'; return; }
+    debounceH = setTimeout(async () => {
+      try {
+        const res = await searchNominatim(q);
+        renderSuggestions(suggestHome, res, drawHome);
+      } catch (e) {
+        console.error(e); suggestHome.style.display = 'none';
       }
-    });
-    unitsSelect.addEventListener('change', () => {
-      if (boundaryLayer.getLayers().length) {
-        drawBoundaryAndBuffer(boundaryLayer.toGeoJSON().features);
+    }, 300);
+  });
+
+  destInput.addEventListener('input', () => {
+    const q = destInput.value.trim();
+    if (debounceD) clearTimeout(debounceD);
+    if (q.length < 3) { suggestDest.style.display = 'none'; return; }
+    debounceD = setTimeout(async () => {
+      try {
+        const res = await searchNominatim(q);
+        renderSuggestions(suggestDest, res, drawDestination);
+      } catch (e) {
+        console.error(e); suggestDest.style.display = 'none';
       }
+    }, 300);
+  });
+
+  // Hide suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('searchBar').contains(e.target)) {
+      suggestHome.style.display = 'none';
+      suggestDest.style.display = 'none';
+    }
+  });
+
+  // ===== Locate Me (sets Home) =====
+  locateBtn.addEventListener('click', async () => {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    locateBtn.disabled = true; locateBtn.textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+        const rev = await reverseNominatim(lat, lon);
+        // Reverse payload from Nominatim differs from /search; make a pseudo-place
+        const placeLike = {
+          lat: rev.lat || String(lat),
+          lon: rev.lon || String(lon),
+          osm_type: (rev.osm_type || '').toLowerCase(), // may be 'relation'
+          osm_id: rev.osm_id,
+          address: rev.address || {}
+        };
+        const geom = await resolveGeometryFromPlace(placeLike);
+        drawHome(geom);
+        // Set input text to a nice label
+        homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+      } catch (e) {
+        alert('Locate failed: ' + e.message);
+        console.error(e);
+      } finally {
+        locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)';
+      }
+    }, (err) => {
+      alert('Geolocation error: ' + err.message);
+      locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)';
     });
-  </script>
+  });
+
+  // ===== Radius / Units change -> recompute buffers/overlap without re-searching =====
+  function recomputeAll() {
+    // Re-draw home from stored geometry
+    if (homeGeometry) {
+      drawHome(homeGeometry);
+    }
+    // Re-draw destination from stored geometry (will also recompute overlap)
+    if (destGeometry) {
+      drawDestination(destGeometry);
+    }
+  }
+
+  radiusInput.addEventListener('change', () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
+  unitsSelect.addEventListener('change',  () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
+
+</script>
 </body>
 </html>
