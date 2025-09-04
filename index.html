@@ -18,12 +18,10 @@
     z-index: 1000; background: white; padding: 10px;
     border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px;
+    display: grid; grid-template-columns: auto 1fr 1fr auto auto; gap: 8px;
     width: min(900px, 94vw);
   }
-  .field {
-    position: relative;
-  }
+  .field { position: relative; }
   input[type="text"], input[type="number"], select, button {
     width: 100%; padding: 8px 10px; font-size: 14px; box-sizing: border-box;
     border: 1px solid #ccc; border-radius: 6px;
@@ -33,9 +31,7 @@
     background: white; border: 1px solid #ccc; border-radius: 6px;
     max-height: 220px; overflow-y: auto; display: none; z-index: 1100;
   }
-  .suggestion {
-    padding: 8px 10px; cursor: pointer;
-  }
+  .suggestion { padding: 8px 10px; cursor: pointer; }
   .suggestion:hover { background: #f2f2f2; }
 
   #legend {
@@ -53,11 +49,49 @@
   .dest-outside { background: #2ecc71; } /* green */
   .dest-inside { background: #e74c3c; }  /* red */
   .point-note { font-size: 12px; color: #555; margin-top: 8px; }
+
+  /* === Hamburger Menu === */
+  #menuWrap { position: relative; display: flex; align-items: center; justify-content: center; }
+  .hamburger-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px; border: 1px solid #ccc;
+    background: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .hamburger-btn:focus { outline: 2px solid #1e90ff; outline-offset: 2px; }
+  .hamburger-icon { width: 18px; height: 14px; position: relative; }
+  .hamburger-icon span { position: absolute; left: 0; right: 0; height: 2px; background: #333; border-radius: 2px; }
+  .hamburger-icon span:nth-child(1) { top: 0; }
+  .hamburger-icon span:nth-child(2) { top: 6px; }
+  .hamburger-icon span:nth-child(3) { top: 12px; }
+
+  #menuDropdown {
+    position: absolute; top: calc(100% + 6px); left: 0;
+    min-width: 220px; background: #fff; border: 1px solid #ccc; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 8px; z-index: 1200; display: none;
+  }
+  #menuDropdown.open { display: block; }
+  .menu-item { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #222; font-size: 14px; }
+  .menu-item:hover { background: #f5f7fb; }
+  .menu-divider { height: 1px; background: #e5e7eb; margin: 6px 0; }
+  @media (max-width: 560px) { #menuDropdown { min-width: 180px; } }
 </style>
 </head>
 <body>
 
 <div id="searchBar">
+  <div id="menuWrap">
+    <button class="hamburger-btn" id="menuBtn" aria-expanded="false" aria-controls="menuDropdown" aria-label="Open menu">
+      <div class="hamburger-icon" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+    </button>
+    <div id="menuDropdown" role="menu" aria-labelledby="menuBtn">
+  <a class="menu-item" href="https://www.musafirmap.com/about">📖 Instructions</a>
+  <a class="menu-item" href="https://www.musafirmap.com">🗺️ Map</a>
+  <a class="menu-item" href="https://www.musafirmap.com/about">❓ Help</a>
+</div>
+
+  </div>
   <div class="field">
     <input type="text" id="homeInput" placeholder="Home City / Address / Postcode" autocomplete="off" spellcheck="false" />
     <div id="suggestHome"></div>
@@ -99,35 +133,47 @@
 <script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
 <script>
+  // === Hamburger Menu ===
+  const menuBtn = document.getElementById('menuBtn');
+  const menuDropdown = document.getElementById('menuDropdown');
+  function closeMenu(){ menuDropdown.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false'); }
+  function openMenu(){ menuDropdown.classList.add('open'); menuBtn.setAttribute('aria-expanded','true'); }
+  function toggleMenu(){ menuDropdown.classList.contains('open') ? closeMenu() : openMenu(); }
+  menuBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleMenu(); });
+  document.addEventListener('click', (e)=>{ if (!document.getElementById('menuWrap').contains(e.target)) closeMenu(); });
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeMenu(); });
+  menuDropdown.addEventListener('keydown', (e)=>{
+    const items = Array.from(menuDropdown.querySelectorAll('a.menu-item'));
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown'){ e.preventDefault(); (items[(i+1)%items.length]||items[0]).focus(); }
+    if (e.key === 'ArrowUp'){ e.preventDefault(); (items[(i-1+items.length)%items.length]||items.at(-1)).focus(); }
+  });
+
   // ===== Map Setup =====
-  const map = L.map('map', {
-  zoomControl: false // disable default
-}).setView([53.795, -1.759], 10);
-
-// Add zoom control in bottom left
-L.control.zoom({
-  position: 'bottomleft'
-}).addTo(map);
-
+  const map = L.map('map', { zoomControl: false }).setView([53.795, -1.759], 10);
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
   // ===== Layers =====
-  // Home
   const homeBoundaryLayer = L.geoJSON(null, { style: { color: '#000', weight: 3, fillOpacity: 0.15 } }).addTo(map);
   const homeBufferLayer   = L.geoJSON(null, { style: { color: '#1e90ff', weight: 3, fillOpacity: 0.10 } }).addTo(map);
   const homeMarkerLayer   = L.layerGroup().addTo(map);
 
-  // Destination: split into outside (green) and inside (red) layers for clarity
   const destOutsideLayer  = L.geoJSON(null, { style: { color: '#2ecc71', weight: 3, fillOpacity: 0.15 } }).addTo(map);
   const destInsideLayer   = L.geoJSON(null, { style: { color: '#e74c3c', weight: 3, fillOpacity: 0.15 } }).addTo(map);
   const destMarkerLayer   = L.layerGroup().addTo(map);
 
-  // ===== State (raw geometries to recalc buffers/overlaps) =====
-  let homeGeometry = null;   // GeoJSON Feature (Polygon/MultiPolygon) OR Point
-  let homeBuffer   = null;   // GeoJSON Feature (Polygon/MultiPolygon)
-  let destGeometry = null;   // GeoJSON Feature (Polygon/MultiPolygon) OR Point
+  // ===== State =====
+  let homeGeometry = null;   // Feature (Polygon/MultiPolygon) OR Point
+  let homeBuffer   = null;   // Feature (Polygon/MultiPolygon)
+  let destGeometry = null;   // Feature (Polygon/MultiPolygon) OR Point
+  let destPinLatLng = null;  // [lat, lon] when destination is address/postcode centre
+
+  // Destination pin colors (darker shades of existing colors)
+  const PIN_GREEN = '#27ae60';
+  const PIN_RED   = '#c0392b';
 
   const homeInput = document.getElementById('homeInput');
   const destInput = document.getElementById('destInput');
@@ -154,7 +200,7 @@ L.control.zoom({
     return resp.json();
   }
 
-  // ===== Overpass: Fetch relation by explicit id (best) =====
+  // ===== Overpass helpers =====
   async function fetchBoundaryByRelationId(osmId) {
     const query = `
 [out:json][timeout:25];
@@ -169,7 +215,6 @@ out skel qt;`;
     return osmtogeojson(data);
   }
 
-  // ===== Overpass: Fallback by name (less precise, last resort) =====
   async function fetchBoundaryByName(name) {
     const query = `
 [out:json][timeout:25];
@@ -221,26 +266,31 @@ out skel qt;`;
     if (b && b.isValid()) map.fitBounds(b.pad(0.2));
   }
 
-  // Convert a Nominatim result to a "best city name" (for boundary search)
   function extractCityName(addr) {
     if (!addr) return null;
     return addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
   }
 
-  // Given a selected Nominatim place, resolve to:
-  // 1) a polygon/multipolygon boundary Feature (preferred), or
-  // 2) a point Feature (fallback)
+  // Classify destination specificity
+  function classifySpecificity(place) {
+    const t = (place.type || '').toLowerCase();
+    const cls = (place.class || '').toLowerCase();
+    const addt = (place.addresstype || '').toLowerCase();
+    if (t === 'postcode' || addt === 'postcode') return 'postcode';
+    const addressTypes = ['house','building','residential','yes','address','road','street','highway'];
+    if (addressTypes.includes(t) || cls === 'building' || cls === 'highway') return 'address';
+    return null;
+  }
+
+  // Resolve selected place to polygon or point
   async function resolveGeometryFromPlace(place) {
-    // If this is already a relation (city boundary), fetch by relation id
     if (place.osm_type === 'relation') {
       try {
         const gj = await fetchBoundaryByRelationId(place.osm_id);
         const polys = gj.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-        if (polys.length) return polys[0]; // Feature
+        if (polys.length) return polys[0];
       } catch (e) { console.warn('Relation fetch failed:', e); }
     }
-
-    // Else, try to get a city name from the address then fetch by name
     const cityName = extractCityName(place.address);
     if (cityName) {
       try {
@@ -249,8 +299,6 @@ out skel qt;`;
         if (polys.length) return polys[0];
       } catch (e) { console.warn('Name-based boundary fetch failed:', e); }
     }
-
-    // Fallback: point geometry
     const lon = parseFloat(place.lon), lat = parseFloat(place.lat);
     return turf.point([lon, lat]);
   }
@@ -259,6 +307,29 @@ out skel qt;`;
     return feature && feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
   }
 
+  // Build a teardrop pin icon with black outline
+  function createPinIcon(color) {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="38" viewBox="0 0 26 38">
+        <path d="M13 1C6.1 1 1 6.3 1 13.2c0 8.4 9.1 18.1 12 24.9 2.9-6.8 12-16.5 12-24.9C25 6.3 19.9 1 13 1z" fill="${color}" stroke="#000" stroke-width="2"/>
+        <circle cx="13" cy="13" r="4.2" fill="#fff" stroke="#000" stroke-width="2"/>
+      </svg>`;
+    return L.divIcon({ html: svg, className: 'pin-icon', iconSize: [26, 38], iconAnchor: [13, 36] });
+  }
+
+  function addDestinationPin() {
+    if (!destPinLatLng) return;
+    if (homeBuffer) {
+      const pt = turf.point([destPinLatLng[1], destPinLatLng[0]]); // lon,lat
+      const inside = turf.booleanPointInPolygon(pt, homeBuffer);
+      const color = inside ? PIN_RED : PIN_GREEN;
+      destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon(color) }));
+    } else {
+      destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon('#333') }));
+    }
+  }
+  function addDestinationPinAt(lat, lon) { destPinLatLng = [lat, lon]; addDestinationPin(); }
+
   function drawHome(geom) {
     clearHomeLayers();
     homeGeometry = geom;
@@ -266,29 +337,20 @@ out skel qt;`;
     const { radius, units } = currentRadiusUnits();
 
     if (isPolygonal(geom)) {
-      // Boundary
       homeBoundaryLayer.addData(geom);
-      // Buffer
       try {
         homeBuffer = turf.buffer(geom, radius, { units });
         homeBufferLayer.addData(homeBuffer);
-      } catch (e) {
-        alert('Buffer error (home): ' + e.message);
-        homeBuffer = null;
-      }
+      } catch (e) { alert('Buffer error (home): ' + e.message); homeBuffer = null; }
     } else {
-      // Point fallback
       const [lon, lat] = geom.geometry.coordinates;
       homeMarkerLayer.addLayer(L.marker([lat, lon]));
       try {
         homeBuffer = turf.buffer(geom, radius, { units });
         homeBufferLayer.addData(homeBuffer);
-      } catch (e) {
-        alert('Buffer error (home point): ' + e.message);
-        homeBuffer = null;
-      }
+      } catch (e) { alert('Buffer error (home point): ' + e.message); homeBuffer = null; }
     }
-    updateDestinationOverlap(); // recalc if destination already chosen
+    updateDestinationOverlap();
     fitToData();
   }
 
@@ -296,32 +358,29 @@ out skel qt;`;
     clearDestLayers();
     destGeometry = geom;
 
-    // If no home buffer yet, just draw destination normally (green boundary/point buffer)
     if (!homeBuffer) {
       if (isPolygonal(geom)) {
-        destOutsideLayer.addData(geom); // show as green (outside layer is green-styled)
+        destOutsideLayer.addData(geom);
+        if (destPinLatLng) { addDestinationPin(); }
       } else {
         const { radius, units } = currentRadiusUnits();
         const [lon, lat] = geom.geometry.coordinates;
-        destMarkerLayer.addLayer(L.marker([lat, lon]));
         try {
           const destBuf = turf.buffer(geom, radius, { units });
           destOutsideLayer.addData(destBuf);
-        } catch (e) {
-          alert('Buffer error (destination point): ' + e.message);
-        }
+        } catch (e) { alert('Buffer error (destination point): ' + e.message); }
+        // neutral pin until home buffer exists
+        addDestinationPinAt(lat, lon);
       }
       fitToData();
       return;
     }
 
-    // If we have a home buffer, compute overlap for polygonal destination.
     updateDestinationOverlap();
     fitToData();
   }
 
   function updateDestinationOverlap() {
-    // Clear destination render, then re-render based on current state
     destOutsideLayer.clearLayers();
     destInsideLayer.clearLayers();
     destMarkerLayer.clearLayers();
@@ -329,71 +388,53 @@ out skel qt;`;
     if (!destGeometry) return;
 
     if (!homeBuffer) {
-      // no overlap logic possible
       if (isPolygonal(destGeometry)) {
         destOutsideLayer.addData(destGeometry);
       } else {
         const { radius, units } = currentRadiusUnits();
         const [lon, lat] = destGeometry.geometry.coordinates;
-        destMarkerLayer.addLayer(L.marker([lat, lon]));
         try {
           const destBuf = turf.buffer(destGeometry, radius, { units });
           destOutsideLayer.addData(destBuf);
-        } catch (e) {
-          alert('Buffer error (destination point): ' + e.message);
-        }
+        } catch (e) { alert('Buffer error (destination point): ' + e.message); }
+        addDestinationPinAt(lat, lon);
       }
       return;
     }
 
-    // We have homeBuffer and a destination geometry
     if (isPolygonal(destGeometry)) {
-      // Intersect destination with home buffer = red
+      if (destPinLatLng) { addDestinationPin(); }
       try {
         const inside = turf.intersect(destGeometry, homeBuffer);
         if (inside) destInsideLayer.addData(inside);
-      } catch (e) {
-        console.warn('Intersect error:', e);
-      }
-
-      // Destination outside home buffer = green (difference)
+      } catch (e) { console.warn('Intersect error:', e); }
       try {
         const outside = turf.difference(destGeometry, homeBuffer);
         if (outside) destOutsideLayer.addData(outside);
-        // If difference failed or null, but there was no intersection, show whole dest as outside
         if (!outside && destInsideLayer.getLayers().length === 0) {
           destOutsideLayer.addData(destGeometry);
         }
       } catch (e) {
         console.warn('Difference error:', e);
-        // Fallback: if intersection drawn, also draw full dest as outside for visibility? No.
-        if (destInsideLayer.getLayers().length === 0) {
-          destOutsideLayer.addData(destGeometry);
-        }
+        if (destInsideLayer.getLayers().length === 0) destOutsideLayer.addData(destGeometry);
       }
     } else {
-      // Destination is a point -> draw its buffer and split visually vs home buffer (point buffer vs home buffer)
       const { radius, units } = currentRadiusUnits();
       try {
         const destBuf = turf.buffer(destGeometry, radius, { units });
-        // Red = intersection of destBuf with homeBuffer
         let hadInside = false;
         try {
           const inside = turf.intersect(destBuf, homeBuffer);
           if (inside) { destInsideLayer.addData(inside); hadInside = true; }
         } catch (e) { console.warn('Point buffer intersect error:', e); }
-        // Green = difference (destBuf - homeBuffer)
         try {
           const outside = turf.difference(destBuf, homeBuffer);
           if (outside) destOutsideLayer.addData(outside);
           if (!outside && !hadInside) destOutsideLayer.addData(destBuf);
-        } catch (e) {
-          console.warn('Point buffer difference error:', e);
-          if (!hadInside) destOutsideLayer.addData(destBuf);
-        }
-      } catch (e) {
-        alert('Buffer error (destination point): ' + e.message);
-      }
+        } catch (e) { console.warn('Point buffer difference error:', e); if (!hadInside) destOutsideLayer.addData(destBuf); }
+        if (destPinLatLng) { addDestinationPin(); }
+        else { const [lon, lat] = destGeometry.geometry.coordinates; addDestinationPinAt(lat, lon); }
+      } catch (e) { alert('Buffer error (destination point): ' + e.message); }
     }
   }
 
@@ -408,30 +449,28 @@ out skel qt;`;
       div.addEventListener('click', async () => {
         container.style.display = 'none';
         try {
+          if (container === suggestDest) {
+            const spec = classifySpecificity(p);
+            if (spec) { destPinLatLng = [parseFloat(p.lat), parseFloat(p.lon)]; }
+            else { destPinLatLng = null; }
+          }
           const geom = await resolveGeometryFromPlace(p);
           onPick(geom);
-        } catch (e) {
-          alert('Failed to resolve selection: ' + e.message);
-          console.error(e);
-        }
+        } catch (e) { alert('Failed to resolve selection: ' + e.message); console.error(e); }
       });
       container.appendChild(div);
     });
     container.style.display = 'block';
   }
 
-  // ===== Search Handlers (debounced) =====
+  // ===== Search Handlers =====
   homeInput.addEventListener('input', () => {
     const q = homeInput.value.trim();
     if (debounceH) clearTimeout(debounceH);
     if (q.length < 3) { suggestHome.style.display = 'none'; return; }
     debounceH = setTimeout(async () => {
-      try {
-        const res = await searchNominatim(q);
-        renderSuggestions(suggestHome, res, drawHome);
-      } catch (e) {
-        console.error(e); suggestHome.style.display = 'none';
-      }
+      try { const res = await searchNominatim(q); renderSuggestions(suggestHome, res, drawHome); }
+      catch (e) { console.error(e); suggestHome.style.display = 'none'; }
     }, 300);
   });
 
@@ -440,12 +479,8 @@ out skel qt;`;
     if (debounceD) clearTimeout(debounceD);
     if (q.length < 3) { suggestDest.style.display = 'none'; return; }
     debounceD = setTimeout(async () => {
-      try {
-        const res = await searchNominatim(q);
-        renderSuggestions(suggestDest, res, drawDestination);
-      } catch (e) {
-        console.error(e); suggestDest.style.display = 'none';
-      }
+      try { const res = await searchNominatim(q); renderSuggestions(suggestDest, res, drawDestination); }
+      catch (e) { console.error(e); suggestDest.style.display = 'none'; }
     }, 300);
   });
 
@@ -465,45 +500,19 @@ out skel qt;`;
       try {
         const lat = pos.coords.latitude, lon = pos.coords.longitude;
         const rev = await reverseNominatim(lat, lon);
-        // Reverse payload from Nominatim differs from /search; make a pseudo-place
-        const placeLike = {
-          lat: rev.lat || String(lat),
-          lon: rev.lon || String(lon),
-          osm_type: (rev.osm_type || '').toLowerCase(), // may be 'relation'
-          osm_id: rev.osm_id,
-          address: rev.address || {}
-        };
+        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {} };
         const geom = await resolveGeometryFromPlace(placeLike);
         drawHome(geom);
-        // Set input text to a nice label
         homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-      } catch (e) {
-        alert('Locate failed: ' + e.message);
-        console.error(e);
-      } finally {
-        locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)';
-      }
-    }, (err) => {
-      alert('Geolocation error: ' + err.message);
-      locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)';
-    });
+      } catch (e) { alert('Locate failed: ' + e.message); console.error(e); }
+      finally { locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
+    }, (err) => { alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; });
   });
 
-  // ===== Radius / Units change -> recompute buffers/overlap without re-searching =====
-  function recomputeAll() {
-    // Re-draw home from stored geometry
-    if (homeGeometry) {
-      drawHome(homeGeometry);
-    }
-    // Re-draw destination from stored geometry (will also recompute overlap)
-    if (destGeometry) {
-      drawDestination(destGeometry);
-    }
-  }
-
+  // ===== Radius / Units change =====
+  function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
   radiusInput.addEventListener('change', () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
   unitsSelect.addEventListener('change',  () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
-
 </script>
 </body>
 </html>
