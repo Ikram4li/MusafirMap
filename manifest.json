@@ -1,0 +1,12 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Musafir Map",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "www.musafirmap",
+  "start_url": "https://www.musafirmap.com/",
+  "theme_color": "#ff811d",
+  "lang": "en"
+}
