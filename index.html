@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Home & Destination Boundaries + Buffer & Overlap</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Musafir Map</title>
 
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Theme color for PWA -->
+  <meta name="theme-color" content="#ff811d">
+
+  <!-- Icons for PWA/Android -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/images/musafir-map-logo-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/assets/images/musafir-map-logo-512.png">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
   html, body { height: 100%; margin: 0; }
@@ -513,6 +523,15 @@ out skel qt;`;
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
   radiusInput.addEventListener('change', () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
   unitsSelect.addEventListener('change',  () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
+
+// Service Worker
+   if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/pwabuilder-sw.js")
+        .then(reg => console.log("Service Worker registered", reg))
+        .catch(err => console.error("Service Worker registration failed", err));
+    });
+  }
 </script>
 </body>
 </html>
