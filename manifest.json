@@ -3,11 +3,11 @@
   "dir": "ltr",
   "display": "standalone",
   "name": "Musafir Map",
-  "orientation": "any",
+  "orientation": "portrait",
   "scope": "/",
   "short_name": "MusafirMap",
-  "start_url": "https://www.musafirmap.com/",
-  "theme_color": "#ff811d",
+  "start_url": "/",
+  "theme_color": "#ffffff",
   "lang": "en",
   "icons": [
     {
@@ -22,3 +22,4 @@
     }
   ]
 }
+
