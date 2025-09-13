@@ -21,5 +21,13 @@
       "type": "image/png"
     }
   ]
+  ],
+  "categories": [
+    "education",
+    "lifestyle",
+    "navigation",
+    "travel",
+    "utilities"
+  ]
 }
 
