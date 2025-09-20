@@ -160,7 +160,7 @@
   });
 
   // ===== Map Setup =====
-  const map = L.map('map', { zoomControl: false }).setView([53.795, -1.759], 10);
+  const map = L.map('map', { zoomControl: false }).setView([40, 0], 3);
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
@@ -523,15 +523,6 @@ out skel qt;`;
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
   radiusInput.addEventListener('change', () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
   unitsSelect.addEventListener('change',  () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
-
-// Service Worker
-   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/pwabuilder-sw.js")
-        .then(reg => console.log("Service Worker registered", reg))
-        .catch(err => console.error("Service Worker registration failed", err));
-    });
-  }
 </script>
 </body>
 </html>
