@@ -963,3 +963,79 @@ blockquote {
 	top: 0;
 	left: -2400px;
 }
+
+/* Base styling for all contact cards */
+.contact-card {
+  background-color: #f8f9fa; /* light grey */
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+/* Shared hover lift */
+.contact-card:hover {
+  transform: translateY(-3px);
+  text-decoration: none;
+}
+
+/* Email card hover */
+.contact-card.email:hover {
+  background-color: #e6f0ff;   /* light blue background */
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3); /* blue glow */
+}
+.contact-card.email:hover h4,
+.contact-card.email:hover p,
+.contact-card.email:hover h5,
+.contact-card.email:hover a {
+  color: #0a58ca !important; /* dark blue text */
+}
+
+/* Instagram card hover */
+.contact-card.instagram:hover {
+  background-color: #ffe6f0;   /* light pink background */
+  box-shadow: 0 4px 12px rgba(255, 77, 166, 0.3); /* pink glow */
+}
+.contact-card.instagram:hover h4,
+.contact-card.instagram:hover p,
+.contact-card.instagram:hover h5,
+.contact-card.instagram:hover a {
+  color: #cc0066 !important; /* dark pink text */
+}
+
+#article11-4 .mbr-section-subtitle {
+  margin-bottom: 2px !important; /* reduce space below */
+  margin-top: 10px !important;    /* optional: reduce top too */
+}
+
+
+#article11-i {
+  margin-top: 100px; /* adjust as needed */
+}
+
+.mbr-section-subtitle:empty {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#hero-text {
+  display: none;
+}
+
+/* Default: center the background */
+#header17-0 {
+  background-position: center;
+}
+
+/* On mobile: shift the parallax background left and contain */
+@media (max-width: 768px) {
+  #header17-0 .mbr-parallax-background {
+    background-position: left center !important;
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-color: #000; /* fallback if needed */
+  }
+}
