@@ -537,21 +537,52 @@ out skel qt;`;
   });
 
   // ===== Locate Me (sets Home) =====
-  locateBtn.addEventListener('click', async () => {
-    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-    locateBtn.disabled = true; locateBtn.textContent = 'Locating…';
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const lat = pos.coords.latitude, lon = pos.coords.longitude;
-        const rev = await reverseNominatim(lat, lon);
-        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {} };
-        const geom = await resolveGeometryFromPlace(placeLike);
-        drawHome(geom);
-        homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-      } catch (e) { alert('Locate failed: ' + e.message); console.error(e); }
-      finally { locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
-    }, (err) => { alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; });
+locateBtn.addEventListener('click', async () => {
+  if (!navigator.geolocation) {
+    showNotice('Geolocation not supported by your browser. Type your city instead.', 'error');
+    return;
+  }
+
+  locateBtn.disabled = true;
+  locateBtn.textContent = 'Locating…';
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const rev = await reverseNominatim(lat, lon);
+      const placeLike = {
+        lat: rev.lat || String(lat),
+        lon: rev.lon || String(lon),
+        osm_type: (rev.osm_type || '').toLowerCase(),
+        osm_id: rev.osm_id,
+        address: rev.address || {}
+      };
+      const geom = await resolveGeometryFromPlace(placeLike);
+      drawHome(geom);
+      homeInput.value =
+        extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+      showNotice('Location detected.', 'success'); // optional
+    } catch (e) {
+      showNotice('Locate failed: ' + e.message, 'error');
+      console.error(e);
+    } finally {
+      locateBtn.disabled = false;
+      locateBtn.textContent = '📍 Locate Me (Home)';
+    }
+  }, (err) => {
+    // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+    if (err.code === 1) {
+      showNotice('Location access was blocked. You can type your city, or allow location in your browser settings.', 'info');
+    } else if (err.code === 3) {
+      showNotice('Locating timed out. Try again or type your city.', 'error');
+    } else {
+      showNotice('Could not get your location (' + err.message + '). You can type your city instead.', 'error');
+    }
+    locateBtn.disabled = false;
+    locateBtn.textContent = '📍 Locate Me (Home)';
   });
+});
+
 
   // ===== Radius / Units change =====
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
