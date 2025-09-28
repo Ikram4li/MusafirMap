@@ -24,12 +24,31 @@
   
 </head>
 <body>
+
+  <!-- Burger Menu Trigger -->
+<button class="mm-burger" aria-label="Open menu" aria-expanded="false" aria-controls="mm-overlay">
+  <span class="bars"></span>
+</button>
+
+<!-- Fullscreen Overlay Menu -->
+<nav id="mm-overlay" class="mm-overlay" role="dialog" aria-modal="true">
+  <div class="mm-menu">
+    <a href="#article11-4" class="mm-link" data-close> 📖 Instructions</a>
+    <a href="https://www.musafirmap.com" class="mm-link"> 🗺️ Map</a>
+    <a href="#list02-a" class="mm-link" data-close>❓ More Info</a>
+    <a href="#contact-buttons" class="mm-link" data-close> ✉️ Contact Us</a>
+
+  </div>
+</nav>
+
+
   
   <section data-bs-version="5.1" class="header16 cid-uVglVV7Lzr mbr-fullscreen mbr-parallax-background" id="header17-0" style="position:relative;">
     
     <!-- Top-left logo -->
-    <img src="assets/images/musafir-map-logo.png" alt="Musafir Map Logo"
-         style="position:absolute; top:20px; left:20px; width:120px; height:auto; z-index:100;">
+     <!-- Top-left logo -->
+<img src="assets/images/musafir-map-logo.png" alt="Musafir Map Logo" class="musafir-logo">
+
 
     <div class="container-fluid">
       <div class="row">
@@ -256,7 +275,7 @@
     </div>
   </section>
 
-<section data-bs-version="5.1" class="contacts1 cid-uXlVEwWa7A" id="contacts1-f">
+<section data-bs-version="5.1" class="contacts1 cid-uXlVEwWa7A" id="contact-buttons">
   <div class="container">
     <div class="mbr-section-head">
       <h3 class="mbr-section-title mbr-fonts-style align-center mb-0 display-2">
@@ -310,5 +329,32 @@
   <script src="assets/smoothscroll/smooth-scroll.js"></script>
   <script src="assets/ytplayer/index.js"></script>
   <script src="assets/theme/js/script.js"></script>  
+
+  <script>
+(function () {
+  const btn = document.querySelector('.mm-burger');
+  const overlay = document.getElementById('mm-overlay');
+  const closeLinks = overlay.querySelectorAll('[data-close]');
+
+  function toggleMenu(force) {
+    const willOpen = force !== undefined ? force : !overlay.classList.contains('open');
+    overlay.classList.toggle('open', willOpen);
+    btn.classList.toggle('active', willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+    document.body.style.overflow = willOpen ? 'hidden' : '';
+  }
+
+  btn.addEventListener('click', () => toggleMenu());
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) toggleMenu(false);
+  });
+  closeLinks.forEach(a => a.addEventListener('click', () => toggleMenu(false)));
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') toggleMenu(false);
+  });
+})();
+</script>
+
 </body>
 </html>
