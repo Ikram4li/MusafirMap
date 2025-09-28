@@ -1039,3 +1039,79 @@ blockquote {
     background-color: #000; /* fallback if needed */
   }
 }
+
+/* === Burger Menu === */
+
+/* Burger button */
+.mm-burger {
+  position: fixed; top: 20px; right: 20px; z-index: 1100;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: rgba(0,0,0,0.55); border-radius: 50%; cursor: pointer;
+  transition: background .2s ease;
+}
+.mm-burger:hover { background: rgba(0,0,0,0.7); }
+.mm-burger .bars {
+  position: relative; width: 22px; height: 2px; background: #fff;
+  transition: transform .35s ease, background .2s ease;
+}
+.mm-burger .bars::before,
+.mm-burger .bars::after {
+  content: ""; position: absolute; left: 0; width: 22px; height: 2px; background: #fff;
+  transition: transform .35s ease, top .35s ease, opacity .2s ease;
+}
+.mm-burger .bars::before { top: -7px; }
+.mm-burger .bars::after  { top: 7px; }
+
+/* Active (X) state */
+.mm-burger.active .bars { background: transparent; }
+.mm-burger.active .bars::before { top: 0; transform: rotate(45deg); }
+.mm-burger.active .bars::after  { top: 0; transform: rotate(-45deg); }
+
+/* Overlay */
+.mm-overlay {
+  position: fixed; inset: 0; z-index: 1090;
+  background: rgba(5, 5, 10, 0.96);
+  opacity: 0; visibility: hidden;
+  transition: opacity .35s ease, visibility .35s ease;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4rem 2rem;
+}
+.mm-overlay.open { opacity: 1; visibility: visible; }
+
+/* Menu inside overlay */
+.mm-menu {
+  text-align: center;
+  transform: translateY(10px); opacity: 0;
+  transition: transform .4s ease, opacity .4s ease;
+}
+.mm-overlay.open .mm-menu { transform: translateY(0); opacity: 1; }
+.mm-menu a {
+  display: block;
+  font-family: "Inter Tight", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-weight: 700;
+  text-decoration: none; color: #fff; margin: 18px 0;
+  font-size: clamp(28px, 6vw, 56px); letter-spacing: .5px;
+}
+.mm-menu a:hover { text-decoration: underline; }
+
+/* Optional: keep top-left logo visible */
+.musafir-logo {
+  position: absolute; top: 20px; left: 20px; width: 120px; height: auto; z-index: 1080;
+}
+
+/* Avoid scroll jump when menu is open */
+body { overscroll-behavior: none; }
+
+html { scroll-behavior: smooth; }
+
+/* Burger menu link hover colour */
+.mm-menu a {
+  color: #ffffff;           /* normal state */
+  transition: color .2s ease, text-decoration-color .2s ease;
+}
+
+.mm-menu a:hover {
+  color: #ff7a00;           /* <-- pick your orange */
+  text-decoration: underline;           /* keep or remove underline */
+  text-decoration-color: #ff7a00;       /* underline matches the hover colour */
+}
