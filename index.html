@@ -126,6 +126,14 @@
   </div>
 </div>
 
+<!-- Inline message area for geolocation / status -->
+<div id="mapNotice" aria-live="polite"
+     style="grid-column: 1 / -1; display:none;
+            font-size:12px; padding:6px 10px;
+            border-radius:6px; border:1px solid #e5e7eb;">
+</div>
+
+
 <div id="map"></div>
 
 <div id="legend">
@@ -145,6 +153,30 @@
 <script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
 <script>
+
+// === Inline notice helper ===
+  function showNotice(msg, tone = 'info') {
+    const box = document.getElementById('mapNotice');
+    if (!box) return;
+    box.style.display = 'block';
+    box.textContent = msg;
+    if (tone === 'error') {
+      box.style.background = '#fff6f6';
+      box.style.borderColor = '#f3c2c2';
+      box.style.color = '#8a1f1f';
+    } else if (tone === 'success') {
+      box.style.background = '#f6fff6';
+      box.style.borderColor = '#c2f3c2';
+      box.style.color = '#1f8a1f';
+    } else {
+      box.style.background = '#f7f9fc';
+      box.style.borderColor = '#e5e7eb';
+      box.style.color = '#334155';
+    }
+    clearTimeout(box._t);
+    box._t = setTimeout(() => { box.style.display = 'none'; }, 5000);
+  }
+  
   // === Hamburger Menu ===
   const menuBtn = document.getElementById('menuBtn');
   const menuDropdown = document.getElementById('menuDropdown');
