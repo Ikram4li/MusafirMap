@@ -49,7 +49,7 @@
       padding: 1.2rem 1.5rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       z-index: 1050;
       pointer-events: none; /* let content be clickable except on logo/burger */
     }
@@ -166,6 +166,21 @@
     .mbr-fullscreen {
       padding-top: 4.5rem;
     }
+
+    /* Logo wrapper (non-fixed) */
+.mm-logo-wrapper {
+  position: absolute;
+  top: 1.2rem;
+  left: 1.5rem;
+  z-index: 900; /* below burger, above hero image */
+}
+
+.mm-logo-wrapper img {
+  height: 8rem !important;
+  width: auto;
+  display: block;
+}
+
   </style>
 </head>
 
@@ -233,15 +248,20 @@
 
 <body>
 
-  <!-- Header: Logo + Burger -->
-  <header class="mm-header">
-    <a href="https://www.musafirmap.com" class="mm-logo">
-      <img src="assets/images/MMLogo.png" alt="MusafirMap Logo">
-    </a>
-    <button class="mm-burger" aria-label="Open menu" aria-expanded="false" aria-controls="mm-overlay">
-      <span class="bars"></span>
-    </button>
-  </header>
+<!-- Logo (does NOT scroll) -->
+<div class="mm-logo-wrapper">
+  <a href="https://www.musafirmap.com" class="mm-logo">
+    <img src="assets/images/MMLogo.png" alt="MusafirMap Logo">
+  </a>
+</div>
+
+<!-- Fixed Header containing only the burger -->
+<header class="mm-header">
+  <button class="mm-burger" aria-label="Open menu" aria-expanded="false" aria-controls="mm-overlay">
+    <span class="bars"></span>
+  </button>
+</header>
+
 
   <!-- Fullscreen Overlay Menu -->
 <nav id="mm-overlay" class="mm-overlay" role="dialog" aria-modal="true">
