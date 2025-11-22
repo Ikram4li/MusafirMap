@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html>
+
+
+<head>
+
+<style>
+  /* Match About page overlay menu exactly */
+  .mm-menu a {
+    font-size: clamp(28px, 6vw, 56px);
+    font-weight: 700;
+    letter-spacing: .5px;
+  }
+</style>
+
+
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+  <link rel="shortcut icon" href="assets/images/logo5.png" type="image/x-icon">
+  <meta name="description" content="">
+
+  <title>More Information</title>
+
+  <!-- Core CSS (same as your other pages) -->
+  <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="assets/bootstrap/css/bootstrap-grid.min.css">
+  <link rel="stylesheet" href="assets/bootstrap/css/bootstrap-reboot.min.css">
+  <link rel="stylesheet" href="assets/parallax/jarallax.css">
+  <link rel="stylesheet" href="assets/theme/css/style.css">
+  <link rel="preload" href="https://fonts.googleapis.com/css?family=Inter+Tight:100,200,300,400,500,600,700,800,900,100i,200i,300i,400i,500i,600i,700i,800i,900i&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter+Tight:100,200,300,400,500,600,700,800,900,100i,200i,300i,400i,500i,600i,700i,800i,900i&display=swap">
+  </noscript>
+  <link rel="preload" as="style" href="assets/mobirise/css/mbr-additional.css">
+  <link rel="stylesheet" href="assets/mobirise/css/mbr-additional.css" type="text/css">
+
+  <!-- Optional: Bootstrap Icons (if you use them elsewhere) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <!-- Minimal custom styles for logo + burger menu -->
+  <style>
+    /* Container for logo + burger */
+    .mm-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1050;
+      pointer-events: none; /* let content be clickable except on logo/burger */
+    }
+
+    .mm-header a,
+    .mm-header button {
+      pointer-events: auto;
+    }
+
+    /* Logo */
+    .mm-logo img {
+      height: 3rem;
+      width: auto;
+      display: block;
+    }
+
+    /* Burger button */
+    .mm-burger {
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 999px;
+      border: none;
+      width: 3rem;
+      height: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      z-index: 1051;
+    }
+
+    .mm-burger:focus {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+
+    .mm-burger .bars,
+    .mm-burger .bars::before,
+    .mm-burger .bars::after {
+      display: block;
+      width: 1.5rem;
+      height: 2px;
+      border-radius: 999px;
+      background: #ffffff;
+      position: relative;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+
+    .mm-burger .bars::before,
+    .mm-burger .bars::after {
+      content: "";
+      position: absolute;
+      left: 0;
+    }
+
+    .mm-burger .bars::before {
+      top: -6px;
+    }
+
+    .mm-burger .bars::after {
+      top: 6px;
+    }
+
+    /* Burger active state (X icon) */
+    .mm-burger[aria-expanded="true"] .bars {
+      transform: rotate(45deg);
+    }
+
+    .mm-burger[aria-expanded="true"] .bars::before {
+      transform: rotate(-90deg);
+      top: 0;
+    }
+
+    .mm-burger[aria-expanded="true"] .bars::after {
+      opacity: 0;
+    }
+
+    /* Fullscreen overlay menu */
+    .mm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1040;
+    }
+
+    .mm-overlay.open {
+      display: flex;
+    }
+
+    .mm-menu {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      font-size: 1.4rem;
+    }
+
+    .mm-link {
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s ease;
+    }
+
+    .mm-link:hover {
+      opacity: 0.8;
+    }
+
+    /* Make sure hero content isn't hidden under fixed header on small screens */
+    .mbr-fullscreen {
+      padding-top: 4.5rem;
+    }
+  </style>
+</head>
+
+  <script src="assets/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/parallax/jarallax.js"></script>
+  <script src="assets/smoothscroll/smooth-scroll.js"></script>
+  <script src="assets/ytplayer/index.js"></script>
+  <script src="assets/mbr-switch-arrow/mbr-switch-arrow.js"></script>
+  <script src="assets/scrollgallery/scroll-gallery.js"></script>
+  <script src="assets/theme/js/script.js"></script>
+
+    <script>
+    (function () {
+      const burger = document.querySelector('.mm-burger');
+      const overlay = document.getElementById('mm-overlay');
+
+      if (!burger || !overlay) return;
+
+      function openMenu() {
+        burger.setAttribute('aria-expanded', 'true');
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        burger.setAttribute('aria-expanded', 'false');
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+
+      burger.addEventListener('click', function () {
+        const isOpen = burger.getAttribute('aria-expanded') === 'true';
+        if (isOpen) {
+          closeMenu();
+        } else {
+          openMenu();
+        }
+      });
+
+      // Click outside (dark area) closes menu
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+          closeMenu();
+        }
+      });
+
+      // Any link with data-close closes menu
+      overlay.querySelectorAll('[data-close]').forEach(function (link) {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // ESC key closes menu
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeMenu();
+        }
+      });
+    })();
+  </script>
+
+</body>
+</html>
+
+
+
+<body>
+
+  <!-- Header: Logo + Burger -->
+  <header class="mm-header">
+    <a href="https://www.musafirmap.com" class="mm-logo">
+      <img src="assets/images/logo5.png" alt="MusafirMap Logo">
+    </a>
+    <button class="mm-burger" aria-label="Open menu" aria-expanded="false" aria-controls="mm-overlay">
+      <span class="bars"></span>
+    </button>
+  </header>
+
+  <!-- Fullscreen Overlay Menu -->
+<nav id="mm-overlay" class="mm-overlay" role="dialog" aria-modal="true">
+  <div class="mm-menu">
+
+    <a href="https://www.musafirmap.com/about/" 
+       class="mm-link" data-close>
+       🏠 Home
+    </a>
+
+    <a href="https://www.musafirmap.com/about/#article11-4" 
+       class="mm-link" data-close>
+       📖 Instructions
+    </a>
+
+    <a href="https://www.musafirmap.com" 
+       class="mm-link">
+       🗺️ Map
+    </a>
+
+    <a href="https://www.musafirmap.com/moreinfo#generic-text-9-uYzN8yVCDA" 
+       class="mm-link" data-close>
+       ❓ More Info
+    </a>
+
+    <a href="https://www.musafirmap.com/about/#contact-buttons" 
+       class="mm-link" data-close>
+       ✉️ Contact Us
+    </a>
+
+  </div>
+</nav>
+
+
+  <!-- HERO -->
+  <section data-bs-version="5.1" class="header18 cid-uYzN8yVSLJ mbr-fullscreen mbr-parallax-background" id="hero-16-uYzN8yVSLJ">
+    <div class="mbr-overlay" style="opacity: 0.3; background-color: rgb(0, 0, 0);"></div>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="content-wrap col-12 col-md-12">
+          <h1 class="mbr-section-title mbr-fonts-style mbr-white mb-4 display-1">
+            <strong>More Information</strong>
+          </h1>
+          <div class="mbr-section-btn">
+            <a class="btn btn-white-outline display-7" href="#">Map</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHO IS A MUSAFIR -->
+  <section data-bs-version="5.1" class="article9 cid-uYzN8yVCDA" id="generic-text-9-uYzN8yVCDA">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="card col-md-12 col-lg-10">
+          <div class="card-wrapper">
+            <div class="card-content-text">
+              <h3 class="card-title mbr-fonts-style mbr-white mt-3 mb-4 display-2">
+                <strong>Who is a Musāfir?</strong>
+              </h3>
+              <div class="row card-box align-left">
+                <div class="item features-without-image col-12 active">
+                  <div class="item-wrapper">
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      A Musāfir is someone who is legally considered a traveler in Islam and therefore allowed certain rukhsas (concessions), such as shortening prayers (Qasr), combining prayers (Jamʿ), and breaking the fast in Ramadan. It is worth noting these concessions differ between the 4 Madhabs.
+                      <br>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="image-wrapper d-flex justify-content-center mt-3">
+              <img src="assets/images/img202502081905332-2.jpeg" alt="More Information">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHEN DOES SOMEONE BECOME A MUSAFIR -->
+  <section data-bs-version="5.1" class="article12 cid-uYzRco4h0Y" id="article12-k">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <h3 class="mbr-section-title mbr-fonts-style mb-4 mt-0 display-2">
+            <strong>When Does Someone Become a Musāfir&nbsp;</strong>
+          </h3>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-v1XOfdllFi" id="article12-15">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ Once a person intends to travel beyond the recognized “travel distance” in Sharīʿah.<br><br>
+            ▶ The Musāfir status begins when they leave the city/town boundary.<br><br>
+            ▶ This status continues until they either:<br><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▷ Return home, or<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▷ Intend to stay in a place long enough that they are no longer considered a traveler.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONDITIONS FOR BEING A MUSAFIR -->
+  <section data-bs-version="5.1" class="article12 cid-uZZCF7spiz" id="article12-w">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <h3 class="mbr-section-title mbr-fonts-style mb-4 mt-0 display-2">
+            <strong>Conditions for Being a Musāfir&nbsp;</strong>
+          </h3>
+          <p class="mbr-text mbr-fonts-style display-7">
+            <strong>Not every trip automatically qualifies a person for the concessions (rukhsas) of travel. The Sharīʿah sets certain conditions to ensure the rules apply correctly.&nbsp;<br></strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+
+  <section data-bs-version="5.1" class="article12 cid-uYzYhl26xy" id="article12-l">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-5">
+            <strong>&nbsp;Intention of Travel&nbsp;</strong>🤲<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzZeXm6H3" id="article12-q">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ A person must intend a valid journey from the outset.<br><br>
+            ▶ Sinful travel (e.g., traveling for the purpose of committing sin) does not grant the concessions. (Check if this is madhab based)<br><br>
+            ▶ If you initially intended a short trip (not qualifying as travel) but later extend it to a qualifying journey, your Musāfir status begins from the moment you decide and cross the distance threshold.<br><br>
+            ▶ If you intended a long journey but cut it short, your status ends upon return.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzZw2a7a1" id="article12-r">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-5">
+            <strong>When Travel Officially Begins 🕔</strong><br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzYHtMHQc" id="article12-m">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ A person must intend a valid journey from the outset.<br><br>
+            ▶ Sinful travel (e.g., traveling for the purpose of committing sin) does not grant the concessions. (Check if this is madhab based)<br><br>
+            ▶ If you initially intended a short trip (not qualifying as travel) but later extend it to a qualifying journey, your Musāfir status begins from the moment you decide and cross the distance threshold.<br><br>
+            ▶ If you intended a long journey but cut it short, your status ends upon return.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzZzG1BnN" id="article12-s">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-5">
+            <strong>Continuity of the Journey🛣️</strong><br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzYVUsIc0" id="article12-n">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ A person must intend a valid journey from the outset.<br><br>
+            ▶ Sinful travel (e.g., traveling for the purpose of committing sin) does not grant the concessions. (Check if this is madhab based)<br><br>
+            ▶ If you initially intended a short trip (not qualifying as travel) but later extend it to a qualifying journey, your Musāfir status begins from the moment you decide and cross the distance threshold.<br><br>
+            ▶ If you intended a long journey but cut it short, your status ends upon return.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzZAWrAS5" id="article12-u">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-5">
+            <strong>&nbsp;Frequent Travellers🔁</strong><br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzYYYpIlR" id="article12-p">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ A person must intend a valid journey from the outset.<br><br>
+            ▶ Sinful travel (e.g., traveling for the purpose of committing sin) does not grant the concessions. (Check if this is madhab based)<br><br>
+            ▶ If you initially intended a short trip (not qualifying as travel) but later extend it to a qualifying journey, your Musāfir status begins from the moment you decide and cross the distance threshold.<br><br>
+            ▶ If you intended a long journey but cut it short, your status ends upon return.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzZAmVOLx" id="article12-t">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-5">
+            <strong>&nbsp;Losing Musāfir Status🚫</strong><br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article12 cid-uYzYWGulxO" id="article12-o">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <p class="mbr-text mbr-fonts-style display-7">
+            ▶ A person must intend a valid journey from the outset.<br><br>
+            ▶ Sinful travel (e.g., traveling for the purpose of committing sin) does not grant the concessions. (Check if this is madhab based)<br><br>
+            ▶ If you initially intended a short trip (not qualifying as travel) but later extend it to a qualifying journey, your Musāfir status begins from the moment you decide and cross the distance threshold.<br><br>
+            ▶ If you intended a long journey but cut it short, your status ends upon return.<br>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="features037 cid-uYzN8yWj3u" id="features-57-uYzN8yWj3u">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-4">
+          <div class="col-12 col-md-12">
+            <h5 class="mbr-section-title mbr-fonts-style mt-0 mb-4 display-2">
+              <strong>Miles That Matter</strong>
+            </h5>
+            <h6 class="mbr-section-subtitle mbr-fonts-style mt-0 mb-4 display-7">
+              How far do I need to travel ?<br>
+              How long must I stay for ?<br>
+              What are the concessions ?
+            </h6>
+            <div class="mbr-section-btn item-footer mt-3 main-button">
+              <a href="" class="btn item-btn btn-primary display-7">See the Breakdown</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-8 side-features">
+          <div class="item features-without-image col-12 col-md-12 col-lg-6 item-mb active">
+            <div class="item-wrapper">
+              <div class="item-content align-left">
+                <h5 class="card-title mbr-fonts-style display-5">
+                  <strong>Hanafi</strong>
+                </h5>
+                <p class="card-text mbr-fonts-style display-7">
+                  Known for being very clear and structured - they like firm rules so there's no confusion about when a journey really counts.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="item features-without-image col-12 col-md-12 col-lg-6 item-mb">
+            <div class="item-wrapper">
+              <div class="item-content align-left">
+                <h5 class="card-title mbr-fonts-style display-5">
+                  <strong>Maliki</strong>
+                </h5>
+                <p class="card-text mbr-fonts-style display-7">
+                  Looks at how people actually travel - what society considers a real trip plays a big part.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="item features-without-image col-12 col-md-12 col-lg-6 item-mb">
+            <div class="item-wrapper">
+              <div class="item-content align-left">
+                <h5 class="card-title mbr-fonts-style display-5">
+                  <strong>Shafi'i</strong>
+                </h5>
+                <p class="card-text mbr-fonts-style display-7">
+                  Keeps things precise and straightforward - sticking closely to clear evidence and simple definitions.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="item features-without-image col-12 col-md-12 col-lg-6 item-mb">
+            <div class="item-wrapper">
+              <div class="item-content align-left">
+                <h5 class="card-title mbr-fonts-style display-5">
+                  <strong>Hanbali</strong>
+                </h5>
+                <p class="card-text mbr-fonts-style display-7">
+                  Takes a balanced, practical approach - considering both early tradition and how travel works in real life.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article9 cid-uZZz90ywft" id="article09-v">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="card col-md-12 col-lg-10">
+          <div class="card-wrapper">
+            <div class="card-content-text">
+              <h3 class="card-title mbr-fonts-style mbr-white mt-3 mb-4 display-2">
+                <strong>The Fiqh (Islamic Law)&nbsp;</strong>
+              </h3>
+              <div class="row card-box align-left">
+                <div class="item features-without-image col-12">
+                  <div class="item-wrapper">
+                    <h4 class="mbr-section-subtitle mbr-fonts-style mb-3 display-5">
+                      <strong>Distance Ruling</strong>
+                    </h4>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      In classical fiqh, the journey was not defined by kilometers or miles. Instead, it was measured in time taken to travel: typically three days and nights of travel by camel or foot.
+                      <br>
+                    </p>
+                  </div>
+                </div>
+
+                <div class="item features-without-image col-12">
+                  <div class="item-wrapper">
+                    <h4 class="mbr-section-subtitle mbr-fonts-style mb-3 display-5">
+                      <strong>Why the Difference of Opinion</strong>
+                    </h4>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      All four madhāhib agree that a minimum distance threshold exists. The minimum distance someone must travel before being considered a traveller is four baarids (equivalent to four farsakhs). Later scholars converted these travel durations into modern distance estimates, which generally fall between 77–88 km (48–54.5 miles).<br><br>
+                      However, older measurement systems—such as Roman and Scandinavian miles—were not identical, so when scholars translated the classical distances into modern units, slight differences emerged. This is the main reason contemporary estimates vary.<br><br>
+                      In addition to the distance requirement, classical jurists also emphasised that a person must leave the limits of their city or town (the built-up area) before the rulings of travel apply. Simply travelling a long distance within a large metropolitan area does not constitute being a musāfir.<br><br>
+                      So, within each madhab, the concept is the same, but the exact number in km/miles is a modern approximation, not an intrinsic fiqh disagreement.&nbsp;<br>
+                    </p>
+                  </div>
+                </div>
+
+                <div class="item features-without-image col-12">
+                  <div class="item-wrapper">
+                    <h4 class="mbr-section-subtitle mbr-fonts-style mb-3 display-5">
+                      <strong>Where is the City Boundary&nbsp;</strong>
+                    </h4>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      Historically, the boundary of a city (ḥadd al-miṣr) was easy to identify. Classical scholars mentioned clear markers that showed a person had left the settled area, such as:
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      &nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;Waste disposal sites located outside the city,
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      &nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;Agricultural land replacing houses,
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      &nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;A drop in infrastructure,
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      &nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;The end of main roads and pathways,
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      &nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;City gates or designated entry/exit points.
+                    </p>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      <br>
+                      These signs made it obvious where the city ended and where open travel began.<br><br>
+                      In the modern world, however, this clarity has largely disappeared. Urban areas have expanded, and many cities now merge seamlessly with neighbouring towns. Motorways, retail parks, industrial estates, and continuous housing mean you can travel many kilometres without any obvious transition from one city to another. As a result, determining the exact “city boundary” is no longer straightforward.<br><br>
+                      This practical challenge is one of the key reasons MusāfirMap was created. Our city-plotting method uses established digital mapping boundaries consistent with platforms like Google Maps to provide a clear, reliable, and standardised representation of where your city ends. Once a user steps beyond this boundary and travels the minimum required distance, the conditions for being a musāfir are satisfied according to the widely accepted methodology.<br>
+                    </p>
+                  </div>
+                </div>
+
+                <div class="item features-without-image col-12">
+                  <div class="item-wrapper">
+                    <h4 class="mbr-section-subtitle mbr-fonts-style mb-3 display-5">
+                      <strong>As the crow flies vs distance travelled</strong>
+                    </h4>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      A common question today is whether the minimum travel distance should be measured as the crow flies (straight-line distance) or according to the actual route travelled.<br><br>
+                      Classical scholars understood travel distance in terms of the actual journey undertaken, not theoretical straight-line measurements. However, with modern infrastructure&nbsp; such as : roads, motorways, rail networks, and more direct travel routes, the difference between "as the crow flies distance" and actual travelled distance is often much smaller than it was historically.<br><br>
+                      MusafirMap uses a radius (straight-line) distance around the selected home city. Once a user crosses this boundary (Traveller's Threshold 🟦), they have exceeded the minimum linear distance that fulfills the requirement according to the more conservative interpretation of distance.<br><br>
+                      Users who prefer to follow the distance-travelled method can still use MusafirMap to identify where their city limits end (Home City Boundary ⬛) and then track the actual miles or kilometres of their route from that point onward.<br><br>
+                      This approach provides flexibility while maintaining fidelity to the core fiqh principle: that the ruling applies when a person genuinely leaves their home city and travels a significant distance.<br><br>
+                    </p>
+                  </div>
+                </div>
+                
+                <div class="item features-without-image col-12">
+                  <div class="item-wrapper">
+                    <h4 class="mbr-section-subtitle mbr-fonts-style mb-3 display-5">
+                      <strong>Duration of Stay</strong>
+                    </h4>
+                    <p class="mbr-text mbr-fonts-style display-7">
+                      This part is madhhab specific. Here's a handy Table that shows the maximum number of days of you can stay until you lose your Musafir Status. Note this is only applicable if you are staying in the same place/city and will reset if you continue your travels within this period (Again you must travel past the Traveller Threshold of your location for this to apply). [Image of Table Below]<br>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="image-wrapper d-flex justify-content-center mt-3">
+              <img src="assets/images/13.jpg" alt="Fiqh Details">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONCESSIONS WHILE TRAVELLING + ACCORDION -->
+  <section data-bs-version="5.1" class="article12 cid-uZZNsFTdj2" id="article12-y">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-12 col-lg-10">
+          <h3 class="mbr-section-title mbr-fonts-style mb-4 mt-0 display-2">
+            <strong>Concessions While Traveling&nbsp;</strong>
+          </h3>
+          <p class="mbr-text mbr-fonts-style display-7">
+            <strong>
+              Allah has made the religion easy, and part of this mercy is that a traveler (Musāfir) is allowed special concessions (Rukhsas) in worship. These are not punishments but gifts — ways to maintain devotion without hardship.&nbsp;
+            </strong>
+          </p>
+        </div>
+      </div>
+
+      <!-- Accordion for concessions -->
+      <div class="row justify-content-center mt-4">
+        <div class="col-12 col-md-12 col-lg-10 m-auto">
+          <div id="bootstrap-accordion_concessions" class="panel-group accordionStyles accordion" role="tablist" aria-multiselectable="true">
+
+            <!-- QASR -->
+            <div class="card">
+              <div class="card-header" role="tab" id="headingQasr">
+                <a role="button" class="panel-title collapsed" data-toggle="collapse" data-bs-toggle="collapse" href="#collapseQasr" aria-expanded="false" aria-controls="collapseQasr">
+                  <h6 class="panel-title-edit mbr-semibold mbr-fonts-style mb-0 display-5">
+                    Shortening the Prayer (Qasr) ➖
+                  </h6>
+                  <span class="sign mbr-iconfont mobi-mbri-arrow-down"></span>
+                </a>
+              </div>
+              <div id="collapseQasr" class="panel-collapse noScroll collapse" role="tabpanel" aria-labelledby="headingQasr" data-bs-parent="#bootstrap-accordion_concessions">
+                <div class="panel-body">
+                  <p class="mbr-fonts-style panel-text display-7">
+                    <strong>What it means:</strong> Reducing the 4-rakʿah Fardh prayers (Dhuhr, ʿAsr, ʿIshāʾ) to 2 rakʿāt.<br><br>
+                    <em>(Note: Fajr (2 rakʿāt) and Maghrib (3 rakʿāt) remain the same.)</em><br><br>
+                    <strong>Madhhab differences:</strong><br>
+                    <strong>Hanafi</strong> → Qasr is obligatory for the Musāfir.<br><br>
+                    <strong>Shāfiʿi / Mālikī / Hanbali</strong> → Qasr is permissible/recommended but not obligatory.<br><br>
+                    <strong>[Insert Table]</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- JAM' -->
+            <div class="card">
+              <div class="card-header" role="tab" id="headingJam">
+                <a role="button" class="panel-title collapsed" data-toggle="collapse" data-bs-toggle="collapse" href="#collapseJam" aria-expanded="false" aria-controls="collapseJam">
+                  <h6 class="panel-title-edit mbr-semibold mbr-fonts-style mb-0 display-5">
+                    Combining the Prayer (Jamʿ) ➕
+                  </h6>
+                  <span class="sign mbr-iconfont mobi-mbri-arrow-down"></span>
+                </a>
+              </div>
+              <div id="collapseJam" class="panel-collapse noScroll collapse" role="tabpanel" aria-labelledby="headingJam" data-bs-parent="#bootstrap-accordion_concessions">
+                <div class="panel-body">
+                  <p class="mbr-fonts-style panel-text display-7">
+                    <strong>What it means:</strong> Praying two prayers in one time slot, for example:<br><br>
+                    ▷ Dhuhr with ʿAsr (either at Dhuhr time or ʿAsr time).<br>
+                    ▷ Maghrib with ʿIshāʾ (either at Maghrib time or ʿIshāʾ time).<br><br>
+                    <strong>Madhhab differences:</strong><br>
+                    <strong>Hanafi</strong> → Does not allow Jamʿ in normal travel (only during Hajj at ʿArafāt/Muzdalifah).<br><br>
+                    <strong>Shāfiʿi / Mālikī / Hanbali</strong> → Allow Jamʿ for a traveler, with conditions.<br><br>
+                    <em>[And which ones can be combined i.e. can Fajr be combined with Zuhr, or ʿIshāʾ and Fajr?]</em>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- FASTING -->
+            <div class="card">
+              <div class="card-header" role="tab" id="headingFasting">
+                <a role="button" class="panel-title collapsed" data-toggle="collapse" data-bs-toggle="collapse" href="#collapseFasting" aria-expanded="false" aria-controls="collapseFasting">
+                  <h6 class="panel-title-edit mbr-semibold mbr-fonts-style mb-0 display-5">
+                    Fasting in Ramadan 🍴
+                  </h6>
+                  <span class="sign mbr-iconfont mobi-mbri-arrow-down"></span>
+                </a>
+              </div>
+              <div id="collapseFasting" class="panel-collapse noScroll collapse" role="tabpanel" aria-labelledby="headingFasting" data-bs-parent="#bootstrap-accordion_concessions">
+                <div class="panel-body">
+                  <p class="mbr-fonts-style panel-text display-7">
+                    A Musāfir is allowed to break the fast if fasting is difficult.<br><br>
+                    They must make up missed fasts later.<br><br>
+                    If fasting causes no hardship, it is often better to fast (opinions vary between scholars).<br>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- KHUFFAYN -->
+            <div class="card">
+              <div class="card-header" role="tab" id="headingKhuffayn">
+                <a role="button" class="panel-title collapsed" data-toggle="collapse" data-bs-toggle="collapse" href="#collapseKhuffayn" aria-expanded="false" aria-controls="collapseKhuffayn">
+                  <h6 class="panel-title-edit mbr-semibold mbr-fonts-style mb-0 display-5">
+                    Wiping Over Footwear (Khuffayn) 🧦
+                  </h6>
+                  <span class="sign mbr-iconfont mobi-mbri-arrow-down"></span>
+                </a>
+              </div>
+              <div id="collapseKhuffayn" class="panel-collapse noScroll collapse" role="tabpanel" aria-labelledby="headingKhuffayn" data-bs-parent="#bootstrap-accordion_concessions">
+                <div class="panel-body">
+                  <p class="mbr-fonts-style panel-text display-7">
+                    A Musāfir may wipe over the khuffayn (seek clarification on what is constituted as khuffayn) for up to 72 hours (instead of 24 hours for residents). (Check which madhhabs apply this).<br><br>
+                    <strong>Conditions:</strong> Wudūʾ must be made in a state of purity, and the socks/footwear must cover the area required for washing.<br>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- OTHER CONCESSIONS -->
+            <div class="card">
+              <div class="card-header" role="tab" id="headingOtherConcessions">
+                <a role="button" class="panel-title collapsed" data-toggle="collapse" data-bs-toggle="collapse" href="#collapseOtherConcessions" aria-expanded="false" aria-controls="collapseOtherConcessions">
+                  <h6 class="panel-title-edit mbr-semibold mbr-fonts-style mb-0 display-5">
+                    Other Concessions 🚫
+                  </h6>
+                  <span class="sign mbr-iconfont mobi-mbri-arrow-down"></span>
+                </a>
+              </div>
+              <div id="collapseOtherConcessions" class="panel-collapse noScroll collapse" role="tabpanel" aria-labelledby="headingOtherConcessions" data-bs-parent="#bootstrap-accordion_concessions">
+                <div class="panel-body">
+                  <p class="mbr-fonts-style panel-text display-7">
+                    <strong>Tayammum:</strong> If water is genuinely unavailable or would cause hardship.<br><br>
+                    <strong>Excused postures:</strong> A Musāfir may pray sitting or lying down if standing causes hardship (same as a resident, but often more relevant during travel).<br><br>
+                    <strong>Use of transport:</strong> Praying sunnah/nafl prayers while riding is allowed.<br>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div> <!-- /accordion -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NITTY-GRITTY SECTION REMOVED -->
+
+  <section data-bs-version="5.1" class="gallery07 cid-uYzN8z0XcW" id="gallery-16-uYzN8z0XcW">
+    <div class="container-fluid gallery-wrapper">
+      <div class="row justify-content-center">
+        <div class="col-12 content-head">
+          <div class="mbr-section-head mb-5">
+            <h4 class="mbr-section-title mbr-fonts-style align-center mb-0 display-2">
+              <strong>The Musafir Collective</strong>
+            </h4>
+            <h5 class="mbr-section-subtitle mbr-fonts-style align-center mb-0 mt-4 display-7">
+              <strong>Tag us &amp; use our Hashtag for to be featured !<br>@MusafirMap #MusafirMap</strong>&nbsp;
+            </h5>
+          </div>
+        </div>
+      </div>
+      <div class="grid-container">
+        <div class="grid-container-3 moving-left" style="transform: translate3d(-200px, 0px, 0px);">
+          <div class="grid-item">
+            <img src="assets/images/img20240714122636-3.jpeg" alt="Musafir Collective 1">
+          </div>
+          <div class="grid-item">
+            <img src="assets/images/img20240716132943.jpeg" alt="Musafir Collective 2">
+          </div>
+          <div class="grid-item">
+            <img src="assets/images/img20250209101633-1.jpeg" alt="Musafir Collective 3">
+          </div>
+          <div class="grid-item">
+            <img src="assets/images/img202407161158342.jpeg" alt="Musafir Collective 4">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-bs-version="5.1" class="article4 cid-uYzN8z0i44" id="generic-text-4-uYzN8z0i44">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-md-12 col-lg-6 image-wrapper">
+          <img class="w-100" src="assets/images/img20250210144748.jpg" alt="Divine Words on Travel">
+        </div>
+        <div class="col-12 col-md-12 col-lg">
+          <div class="text-wrapper align-left">
+            <h1 class="mbr-section-title mbr-fonts-style mb-4 display-2">
+              <strong>Divine Words on Travel</strong>
+            </h1>
+            <p class="mbr-text mbr-fonts-style mb-3 display-7">
+              The Qur'an itself hints at these concessions. Allah says, "And when you travel throughout the land, there is no blame upon you for shortening the prayer..." (An-Nisa 4:100). This verse is a foundational stone for understanding the permissibility of Qasr.
+            </p>
+            <p class="mbr-text mbr-fonts-style mb-3 display-7">
+              Furthermore, the Prophet Muhammad (peace be upon him) exemplified these rulings. His actions and sayings provide the practical application and context for the Qur'anic verses, guiding us on how to implement these divine mercies.
+            </p>
+            <p class="mbr-text mbr-fonts-style mb-3 display-7">
+              Consider the hadith where Aisha (may Allah be pleased with her) reported that prayer was shortened during travel. This historical account solidifies the practice and its acceptance within the Muslim community.<br><br>
+              سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ وَإِنَّا إِلَىٰ رَبِّنَا لَمُنْقَلِبُونَ
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scripts -->
+  <script src="assets/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/parallax/jarallax.js"></script>
+  <script src="assets/smoothscroll/smooth-scroll.js"></script>
+  <script src="assets/ytplayer/index.js"></script>
+  <script src="assets/mbr-switch-arrow/mbr-switch-arrow.js"></script>
+  <script src="assets/scrollgallery/scroll-gallery.js"></script>
+  <script src="assets/theme/js/script.js"></script>
+
+  <script>
+    (function () {
+      const burger = document.querySelector('.mm-burger');
+      const overlay = document.getElementById('mm-overlay');
+
+      if (!burger || !overlay) return;
+
+      function openMenu() {
+        burger.setAttribute('aria-expanded', 'true');
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        burger.setAttribute('aria-expanded', 'false');
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+
+      burger.addEventListener('click', function () {
+        const isOpen = burger.getAttribute('aria-expanded') === 'true';
+        if (isOpen) {
+          closeMenu();
+        } else {
+          openMenu();
+        }
+      });
+
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+          closeMenu();
+        }
+      });
+
+      overlay.querySelectorAll('[data-close]').forEach(function (link) {
+        link.addEventListener('click', closeMenu);
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeMenu();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
