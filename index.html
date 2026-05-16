@@ -96,29 +96,10 @@
       </div>
     </button>
     <div id="menuDropdown" role="menu" aria-labelledby="menuBtn">
-
-  <a class="menu-item" href="https://www.musafirmap.com/about/">
-    🏠 Home
-  </a>
-
-  <a class="menu-item" href="https://www.musafirmap.com/about/#article11-4">
-    📖 Instructions
-  </a>
-
-  <a class="menu-item" href="https://www.musafirmap.com">
-    🗺️ Map
-  </a>
-
-  <a class="menu-item" href="https://www.musafirmap.com/moreinfo#generic-text-9-uYzN8yVCDA">
-    ❓ More Info
-  </a>
-
-  <a class="menu-item" href="https://www.musafirmap.com/about/#contact-buttons">
-    ✉️ Contact Us
-  </a>
-
+  <a class="menu-item" href="https://www.musafirmap.com/about">📖 Instructions</a>
+  <a class="menu-item" href="https://www.musafirmap.com">🗺️ Map</a>
+  <a class="menu-item" href="https://www.musafirmap.com/about">❓ Help</a>
 </div>
-
 
   </div>
   <div class="field">
@@ -130,7 +111,7 @@
     <div id="suggestDest"></div>
   </div>
   <div class="field" title="Buffer radius">
-    <input type="number" id="radiusInput" min="1" max="100" value="48" />
+    <input type="number" id="radiusInput" min="1" max="100" value="54.7" />
   </div>
   <div class="field" title="Units">
     <select id="unitsSelect">
@@ -142,14 +123,6 @@
     <button id="locateBtn" style="flex:0 0 auto; min-width:130px;">📍 Locate Me (Home)</button>
   </div>
 </div>
-
-<!-- Inline message area for geolocation / status -->
-<div id="mapNotice" aria-live="polite"
-     style="grid-column: 1 / -1; display:none;
-            font-size:12px; padding:6px 10px;
-            border-radius:6px; border:1px solid #e5e7eb;">
-</div>
-
 
 <div id="map"></div>
 
@@ -170,30 +143,6 @@
 <script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
 <script>
-
-// === Inline notice helper ===
-  function showNotice(msg, tone = 'info') {
-    const box = document.getElementById('mapNotice');
-    if (!box) return;
-    box.style.display = 'block';
-    box.textContent = msg;
-    if (tone === 'error') {
-      box.style.background = '#fff6f6';
-      box.style.borderColor = '#f3c2c2';
-      box.style.color = '#8a1f1f';
-    } else if (tone === 'success') {
-      box.style.background = '#f6fff6';
-      box.style.borderColor = '#c2f3c2';
-      box.style.color = '#1f8a1f';
-    } else {
-      box.style.background = '#f7f9fc';
-      box.style.borderColor = '#e5e7eb';
-      box.style.color = '#334155';
-    }
-    clearTimeout(box._t);
-    box._t = setTimeout(() => { box.style.display = 'none'; }, 5000);
-  }
-  
   // === Hamburger Menu ===
   const menuBtn = document.getElementById('menuBtn');
   const menuDropdown = document.getElementById('menuDropdown');
@@ -211,7 +160,7 @@
   });
 
   // ===== Map Setup =====
-  const map = L.map('map', { zoomControl: false }).setView([40, 0], 3);
+  const map = L.map('map', { zoomControl: false }).setView([53.795, -1.759], 10);
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
@@ -554,52 +503,21 @@ out skel qt;`;
   });
 
   // ===== Locate Me (sets Home) =====
-locateBtn.addEventListener('click', async () => {
-  if (!navigator.geolocation) {
-    showNotice('Geolocation not supported by your browser. Type your city instead.', 'error');
-    return;
-  }
-
-  locateBtn.disabled = true;
-  locateBtn.textContent = 'Locating…';
-
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    try {
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      const rev = await reverseNominatim(lat, lon);
-      const placeLike = {
-        lat: rev.lat || String(lat),
-        lon: rev.lon || String(lon),
-        osm_type: (rev.osm_type || '').toLowerCase(),
-        osm_id: rev.osm_id,
-        address: rev.address || {}
-      };
-      const geom = await resolveGeometryFromPlace(placeLike);
-      drawHome(geom);
-      homeInput.value =
-        extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-      showNotice('Location detected.', 'success'); // optional
-    } catch (e) {
-      showNotice('Locate failed: ' + e.message, 'error');
-      console.error(e);
-    } finally {
-      locateBtn.disabled = false;
-      locateBtn.textContent = '📍 Locate Me (Home)';
-    }
-  }, (err) => {
-    // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
-    if (err.code === 1) {
-      showNotice('Location access was blocked. You can type your city, or allow location in your browser settings.', 'info');
-    } else if (err.code === 3) {
-      showNotice('Locating timed out. Try again or type your city.', 'error');
-    } else {
-      showNotice('Could not get your location (' + err.message + '). You can type your city instead.', 'error');
-    }
-    locateBtn.disabled = false;
-    locateBtn.textContent = '📍 Locate Me (Home)';
+  locateBtn.addEventListener('click', async () => {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    locateBtn.disabled = true; locateBtn.textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+        const rev = await reverseNominatim(lat, lon);
+        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {} };
+        const geom = await resolveGeometryFromPlace(placeLike);
+        drawHome(geom);
+        homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+      } catch (e) { alert('Locate failed: ' + e.message); console.error(e); }
+      finally { locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
+    }, (err) => { alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; });
   });
-});
-
 
   // ===== Radius / Units change =====
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
