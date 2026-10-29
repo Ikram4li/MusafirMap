@@ -84,6 +84,26 @@
   .menu-item:hover { background: #f5f7fb; }
   .menu-divider { height: 1px; background: #e5e7eb; margin: 6px 0; }
   @media (max-width: 560px) { #menuDropdown { min-width: 180px; } }
+
+  #boundaryLoading[hidden] { display: none; }
+  #boundaryLoading {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.88); backdrop-filter: blur(3px);
+    font: 600 16px system-ui, sans-serif; color: #18251b;
+    cursor: progress;
+  }
+  .loading-track { width: 100%; overflow: hidden; padding: 20px 0; text-align: center; }
+  .loading-camel {
+    width: clamp(110px, 22vw, 180px); height: auto;
+    animation: camel-travel 2.8s ease-in-out infinite alternate;
+  }
+  #boundaryLoading p { margin: 18px 20px; text-align: center; }
+  @keyframes camel-travel {
+    from { transform: translateX(-28vw) translateY(0); }
+    to { transform: translateX(28vw) translateY(-8px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .loading-camel { animation: none; } }
 </style>
 </head>
 <body>
@@ -126,6 +146,13 @@
 </div>
 
 <div id="map"></div>
+
+<div id="boundaryLoading" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <div class="loading-track">
+    <img class="loading-camel" src="/about/assets/images/musafir-map-logo-eye-free.png" alt="" width="180" height="180">
+  </div>
+  <p>Loading your city boundaries…</p>
+</div>
 
 <div id="legend">
   <h4>Legend</h4>
@@ -195,6 +222,30 @@
   const locateBtn   = document.getElementById('locateBtn');
 
   let debounceH = null, debounceD = null;
+
+  // ===== Boundary loading overlay =====
+  const boundaryLoading = document.getElementById('boundaryLoading');
+  let pendingBoundaryLoads = 0;
+  function showBoundaryLoading() {
+    pendingBoundaryLoads++;
+    boundaryLoading.hidden = false;
+    document.getElementById('map').setAttribute('aria-busy', 'true');
+  }
+  function hideBoundaryLoading() {
+    pendingBoundaryLoads = Math.max(0, pendingBoundaryLoads - 1);
+    if (!pendingBoundaryLoads) {
+      boundaryLoading.hidden = true;
+      document.getElementById('map').setAttribute('aria-busy', 'false');
+    }
+  }
+  async function withBoundaryLoading(task) {
+    showBoundaryLoading();
+    try {
+      // Let the browser paint the logo before geometry calculations start.
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      return await task();
+    } finally { hideBoundaryLoading(); }
+  }
 
   // ===== Nominatim Search / Reverse =====
   async function searchNominatim(q) {
@@ -469,8 +520,10 @@ out skel qt;`;
             if (spec) { destPinLatLng = [parseFloat(p.lat), parseFloat(p.lon)]; }
             else { destPinLatLng = null; }
           }
-          const geom = await resolveGeometryFromPlace(p);
-          onPick(geom);
+          await withBoundaryLoading(async () => {
+            const geom = await resolveGeometryFromPlace(p);
+            onPick(geom);
+          });
         } catch (e) { alert('Failed to resolve selection: ' + e.message); console.error(e); }
       });
       container.appendChild(div);
@@ -510,6 +563,7 @@ out skel qt;`;
   // ===== Locate Me (sets Home) =====
   locateBtn.addEventListener('click', async () => {
     if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    showBoundaryLoading();
     locateBtn.disabled = true; locateBtn.textContent = 'Locating…';
     navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
@@ -520,14 +574,14 @@ out skel qt;`;
         drawHome(geom);
         homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
       } catch (e) { alert('Locate failed: ' + e.message); console.error(e); }
-      finally { locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
-    }, (err) => { alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; });
+      finally { hideBoundaryLoading(); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
+    }, (err) => { hideBoundaryLoading(); alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }, { timeout: 20000 });
   });
 
   // ===== Radius / Units change =====
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
-  radiusInput.addEventListener('change', () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
-  unitsSelect.addEventListener('change',  () => { try { recomputeAll(); } catch(e){ alert(e.message); } });
+  radiusInput.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); } catch(e){ alert(e.message); } });
+  unitsSelect.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); } catch(e){ alert(e.message); } });
 </script>
 </body>
 </html>
