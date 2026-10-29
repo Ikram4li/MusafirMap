@@ -160,7 +160,7 @@
   <div class="legend-item"><span class="color-box home-buffer"></span>Traveller’s Threshold</div>
   <div class="legend-item"><span class="color-box dest-inside"></span>Non Traveller</div>
   <div class="legend-item"><span class="color-box dest-outside"></span>Traveller</div>
-  <div class="point-note">If a selected item lacks a polygon, a point+buffer is used.</div>
+  <div class="point-note">Home boundary unavailable: a circle is used. Destination cities use outlines; addresses and postcodes use pins.</div>
 </div>
 
 <!-- Leaflet -->
@@ -449,25 +449,8 @@ out skel qt;`;
   function drawDestination(geom) {
     clearDestLayers();
     destGeometry = geom;
-
-    if (!homeBuffer) {
-      if (isPolygonal(geom)) {
-        destOutsideLayer.addData(geom);
-        if (destPinLatLng) { addDestinationPin(); }
-      } else {
-        const { radius, units } = currentRadiusUnits();
-        const [lon, lat] = geom.geometry.coordinates;
-        try {
-          const destBuf = turf.buffer(geom, radius, { units });
-          destOutsideLayer.addData(destBuf);
-        } catch (e) { alert('Buffer error (destination point): ' + e.message); }
-        // neutral pin until home buffer exists
-        addDestinationPinAt(lat, lon);
-      }
-      fitToData();
-      return;
-    }
-
+    destPinLatLng = isPolygonal(geom) ? null :
+      [geom.geometry.coordinates[1], geom.geometry.coordinates[0]];
     updateDestinationOverlap();
     fitToData();
   }
@@ -476,58 +459,23 @@ out skel qt;`;
     destOutsideLayer.clearLayers();
     destInsideLayer.clearLayers();
     destMarkerLayer.clearLayers();
-
     if (!destGeometry) return;
 
-    if (!homeBuffer) {
-      if (isPolygonal(destGeometry)) {
-        destOutsideLayer.addData(destGeometry);
-      } else {
-        const { radius, units } = currentRadiusUnits();
-        const [lon, lat] = destGeometry.geometry.coordinates;
-        try {
-          const destBuf = turf.buffer(destGeometry, radius, { units });
-          destOutsideLayer.addData(destBuf);
-        } catch (e) { alert('Buffer error (destination point): ' + e.message); }
-        addDestinationPinAt(lat, lon);
-      }
+    // Precise destinations are pins only; the radius belongs to the home city.
+    if (!isPolygonal(destGeometry)) {
+      addDestinationPin();
       return;
     }
-
-    if (isPolygonal(destGeometry)) {
-      if (destPinLatLng) { addDestinationPin(); }
-      try {
-        const inside = turf.intersect(destGeometry, homeBuffer);
-        if (inside) destInsideLayer.addData(inside);
-      } catch (e) { console.warn('Intersect error:', e); }
-      try {
-        const outside = turf.difference(destGeometry, homeBuffer);
-        if (outside) destOutsideLayer.addData(outside);
-        if (!outside && destInsideLayer.getLayers().length === 0) {
-          destOutsideLayer.addData(destGeometry);
-        }
-      } catch (e) {
-        console.warn('Difference error:', e);
-        if (destInsideLayer.getLayers().length === 0) destOutsideLayer.addData(destGeometry);
-      }
-    } else {
-      const { radius, units } = currentRadiusUnits();
-      try {
-        const destBuf = turf.buffer(destGeometry, radius, { units });
-        let hadInside = false;
-        try {
-          const inside = turf.intersect(destBuf, homeBuffer);
-          if (inside) { destInsideLayer.addData(inside); hadInside = true; }
-        } catch (e) { console.warn('Point buffer intersect error:', e); }
-        try {
-          const outside = turf.difference(destBuf, homeBuffer);
-          if (outside) destOutsideLayer.addData(outside);
-          if (!outside && !hadInside) destOutsideLayer.addData(destBuf);
-        } catch (e) { console.warn('Point buffer difference error:', e); if (!hadInside) destOutsideLayer.addData(destBuf); }
-        if (destPinLatLng) { addDestinationPin(); }
-        else { const [lon, lat] = destGeometry.geometry.coordinates; addDestinationPinAt(lat, lon); }
-      } catch (e) { alert('Buffer error (destination point): ' + e.message); }
+    if (!homeBuffer) {
+      destOutsideLayer.addData(destGeometry);
+      return;
     }
+    try {
+      const inside = turf.intersect(destGeometry, homeBuffer);
+      const outside = turf.difference(destGeometry, homeBuffer);
+      if (inside) destInsideLayer.addData(inside);
+      if (outside) destOutsideLayer.addData(outside);
+    } catch (e) { console.warn('Destination overlap calculation failed:', e); }
   }
 
   // ===== Suggestions UI =====
@@ -541,13 +489,16 @@ out skel qt;`;
       div.addEventListener('click', async () => {
         container.style.display = 'none';
         try {
-          if (container === suggestDest) {
-            const spec = classifySpecificity(p);
-            if (spec) { destPinLatLng = [parseFloat(p.lat), parseFloat(p.lon)]; }
-            else { destPinLatLng = null; }
-          }
           await withBoundaryLoading(async () => {
-            const geom = await resolveGeometryFromPlace(p);
+            let geom;
+            if (container === suggestDest && classifySpecificity(p)) {
+              geom = turf.point([parseFloat(p.lon), parseFloat(p.lat)]);
+            } else {
+              geom = await resolveGeometryFromPlace(p);
+              if (container === suggestDest && !isPolygonal(geom)) {
+                throw new Error('The city boundary could not be loaded. Please try again, or select a street, address or postcode for a precise destination pin.');
+              }
+            }
             onPick(geom);
           });
         } catch (e) { alert('Failed to resolve selection: ' + e.message); console.error(e); }
