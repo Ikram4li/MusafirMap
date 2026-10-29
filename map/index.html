@@ -249,7 +249,7 @@
 
   // ===== Nominatim Search / Reverse =====
   async function searchNominatim(q) {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&limit=7&accept-language=en`;
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&polygon_geojson=1&limit=7&accept-language=en`;
     const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
     if (!resp.ok) throw new Error('Search failed');
     return resp.json();
@@ -344,29 +344,55 @@ out skel qt;`;
     return null;
   }
 
-  // Resolve selected place to polygon or point
+  // Resolve place nodes to their surrounding city, rather than relying on an
+  // exact global Overpass name match (city labels are often OSM points).
+  async function fetchNearbyCityBoundary(place) {
+    const cityName = extractCityName(place.address) || place.name;
+    const lat = Number(place.lat), lon = Number(place.lon);
+    if (!cityName || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const params = new URLSearchParams({
+      format: 'jsonv2', q: cityName, addressdetails: '1',
+      polygon_geojson: '1', limit: '10', 'accept-language': 'en',
+      bounded: '1',
+      viewbox: [Math.max(-180, lon - 1), Math.min(90, lat + 1),
+                Math.min(180, lon + 1), Math.max(-90, lat - 1)].join(',')
+    });
+    if (place.address?.country_code) params.set('countrycodes', place.address.country_code);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { signal: controller.signal });
+      if (!response.ok) throw new Error('City boundary search failed');
+      const candidates = await response.json();
+      const point = turf.point([lon, lat]);
+      for (const candidate of candidates) {
+        if (candidate.osm_type !== 'relation' ||
+            (candidate.class !== 'boundary' && candidate.category !== 'boundary') ||
+            !['city', 'town', 'village', 'municipality', 'administrative'].includes(candidate.addresstype || candidate.type)) continue;
+        const feature = { type: 'Feature', properties: {}, geometry: candidate.geojson };
+        if (isPolygonal(feature) && turf.booleanPointInPolygon(point, feature)) return feature;
+      }
+      return null;
+    } finally { clearTimeout(timer); }
+  }
+
   async function resolveGeometryFromPlace(place) {
-    // Reuse a city outline supplied by reverse geocoding before querying Overpass.
     if (place.geojson && ['Polygon', 'MultiPolygon'].includes(place.geojson.type)) {
       return { type: 'Feature', properties: {}, geometry: place.geojson };
     }
+    try {
+      const city = await fetchNearbyCityBoundary(place);
+      if (city) return city;
+    } catch (e) { console.warn('Nearby city boundary search failed:', e); }
     if (place.osm_type === 'relation') {
       try {
         const gj = await fetchBoundaryByRelationId(place.osm_id);
-        const polys = gj.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-        if (polys.length) return polys[0];
+        const ownBoundary = gj.features.find(f =>
+          f.id === 'relation/' + place.osm_id && isPolygonal(f));
+        if (ownBoundary) return ownBoundary;
       } catch (e) { console.warn('Relation fetch failed:', e); }
     }
-    const cityName = extractCityName(place.address);
-    if (cityName) {
-      try {
-        const gjByName = await fetchBoundaryByName(cityName);
-        const polys = gjByName.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
-        if (polys.length) return polys[0];
-      } catch (e) { console.warn('Name-based boundary fetch failed:', e); }
-    }
-    const lon = parseFloat(place.lon), lat = parseFloat(place.lat);
-    return turf.point([lon, lat]);
+    return turf.point([parseFloat(place.lon), parseFloat(place.lat)]);
   }
 
   function isPolygonal(feature) {
