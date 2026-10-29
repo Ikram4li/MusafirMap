@@ -205,7 +205,7 @@
   }
 
   async function reverseNominatim(lat, lon) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=en`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&polygon_geojson=1&accept-language=en`;
     const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
     if (!resp.ok) throw new Error('Reverse failed');
     return resp.json();
@@ -295,6 +295,10 @@ out skel qt;`;
 
   // Resolve selected place to polygon or point
   async function resolveGeometryFromPlace(place) {
+    // Reuse a city outline supplied by reverse geocoding before querying Overpass.
+    if (place.geojson && ['Polygon', 'MultiPolygon'].includes(place.geojson.type)) {
+      return { type: 'Feature', properties: {}, geometry: place.geojson };
+    }
     if (place.osm_type === 'relation') {
       try {
         const gj = await fetchBoundaryByRelationId(place.osm_id);
@@ -511,7 +515,7 @@ out skel qt;`;
       try {
         const lat = pos.coords.latitude, lon = pos.coords.longitude;
         const rev = await reverseNominatim(lat, lon);
-        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {} };
+        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {}, geojson: rev.geojson };
         const geom = await resolveGeometryFromPlace(placeLike);
         drawHome(geom);
         homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
