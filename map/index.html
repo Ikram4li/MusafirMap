@@ -350,30 +350,48 @@ out skel qt;`;
     const cityName = extractCityName(place.address) || place.name;
     const lat = Number(place.lat), lon = Number(place.lon);
     if (!cityName || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    const params = new URLSearchParams({
-      format: 'jsonv2', q: cityName, addressdetails: '1',
-      polygon_geojson: '1', limit: '10', 'accept-language': 'en',
-      bounded: '1',
-      viewbox: [Math.max(-180, lon - 1), Math.min(90, lat + 1),
-                Math.min(180, lon + 1), Math.max(-90, lat - 1)].join(',')
-    });
-    if (place.address?.country_code) params.set('countrycodes', place.address.country_code);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    try {
-      const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { signal: controller.signal });
-      if (!response.ok) throw new Error('City boundary search failed');
-      const candidates = await response.json();
-      const point = turf.point([lon, lat]);
-      for (const candidate of candidates) {
-        if (candidate.osm_type !== 'relation' ||
-            (candidate.class !== 'boundary' && candidate.category !== 'boundary') ||
-            !['city', 'town', 'village', 'municipality', 'administrative'].includes(candidate.addresstype || candidate.type)) continue;
-        const feature = { type: 'Feature', properties: {}, geometry: candidate.geojson };
-        if (isPolygonal(feature) && turf.booleanPointInPolygon(point, feature)) return feature;
-      }
-      return null;
-    } finally { clearTimeout(timer); }
+    const normalise = name => (name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const cityKey = normalise(cityName);
+    // Some cities have a separate label node and an administrative outline,
+    // e.g. Glasgow -> Glasgow City. Do not widen to unrelated surrounding counties.
+    const aliases = [cityName];
+    for (const name of [place.address?.municipality, place.address?.county]) {
+      const key = normalise(name);
+      if (key && [cityKey, cityKey + ' city', 'city of ' + cityKey,
+          cityKey + ' city council', 'city of ' + cityKey + ' council'].includes(key) &&
+          !aliases.includes(name)) aliases.push(name);
+    }
+    const allowedNames = new Set(aliases.map(normalise));
+    for (const name of aliases) {
+      const params = new URLSearchParams({
+        format: 'jsonv2', q: name, addressdetails: '1',
+        polygon_geojson: '1', limit: '10', 'accept-language': 'en',
+        bounded: '1',
+        viewbox: [Math.max(-180, lon - 1), Math.min(90, lat + 1),
+                  Math.min(180, lon + 1), Math.max(-90, lat - 1)].join(',')
+      });
+      if (place.address?.country_code) params.set('countrycodes', place.address.country_code);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      try {
+        const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { signal: controller.signal });
+        if (!response.ok) throw new Error('City boundary search failed');
+        const candidates = await response.json();
+        const point = turf.point([lon, lat]);
+        for (const candidate of candidates) {
+          if (candidate.osm_type !== 'relation' ||
+              (candidate.class !== 'boundary' && candidate.category !== 'boundary')) continue;
+          const type = candidate.addresstype || candidate.type;
+          const cityBoundary = ['city', 'town', 'village', 'municipality', 'administrative'].includes(type);
+          const matchingAdministrativeArea = type === 'county' && allowedNames.has(normalise(candidate.name));
+          if (!cityBoundary && !matchingAdministrativeArea) continue;
+          const feature = { type: 'Feature', properties: {}, geometry: candidate.geojson };
+          if (isPolygonal(feature) && turf.booleanPointInPolygon(point, feature)) return feature;
+        }
+      } catch (e) { console.warn('City outline lookup failed:', e); }
+      finally { clearTimeout(timer); }
+    }
+    return null;
   }
 
   async function resolveGeometryFromPlace(place) {
