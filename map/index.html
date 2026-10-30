@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  if (location.hostname === "musafirmap.com") {
+    location.replace("https://www.musafirmap.com" + location.pathname + location.search + location.hash);
+  }
+</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Musafir Map</title>
@@ -114,6 +119,24 @@
   .suggestion:focus { outline:2px solid #1e90ff; outline-offset:-2px; }
   #searchHome, #searchDest { margin-top:4px; }
   @media(max-width:560px) { #selectionStatus { bottom:12px; max-width:calc(100vw - 195px); font-size:12px; } }
+
+  #searchBar { box-sizing:border-box; }
+  .field { min-width:0; }
+  #homeInput, #destInput { padding-right:38px; }
+  #searchHome, #searchDest { position:absolute; top:0; right:0; width:36px; height:100%; max-height:38px; margin:0; padding:6px; border:0; border-left:1px solid #ddd; border-radius:0 6px 6px 0; background:#f5f6f5; display:flex; align-items:center; justify-content:center; }
+  #selectionStatus { box-sizing:border-box; }
+  @media(max-width:560px) {
+    #searchBar { width:calc(100vw - 16px); grid-template-columns:36px minmax(0,1fr) minmax(0,1fr); padding:8px; gap:6px; }
+    #menuWrap { grid-column:1; grid-row:1 / 3; align-items:flex-start; }
+    #searchBar > .field:nth-child(2) { grid-column:2 / 4; grid-row:1; }
+    #searchBar > .field:nth-child(3) { grid-column:2 / 4; grid-row:2; }
+    #searchBar > .field:nth-child(4) { grid-column:2; grid-row:3; }
+    #searchBar > .field:nth-child(5) { grid-column:3; grid-row:3; }
+    #selectionStatus { bottom:auto; left:8px; right:8px; max-width:none; font-size:12px; padding:8px; }
+    #legend { bottom:24px; width:145px; font-size:11px; }
+    #legend h4 { font-size:12px; margin-bottom:4px; }
+    .legend-item { margin:4px 0; gap:6px; }
+  }
 </style>
 </head>
 <body>
@@ -135,12 +158,12 @@
   </div>
   <div class="field">
     <input type="text" id="homeInput" placeholder="Home City / Address / Postcode" autocomplete="off" spellcheck="false" />
-    <button id="searchHome" type="button">Search home</button>
+    <button id="searchHome" type="button" aria-label="Search home" title="Search home"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg></button>
     <div id="suggestHome" role="listbox" aria-label="Home results"></div>
   </div>
   <div class="field">
     <input type="text" id="destInput" placeholder="Destination City / Address / Postcode" autocomplete="off" spellcheck="false" />
-    <button id="searchDest" type="button">Search destination</button>
+    <button id="searchDest" type="button" aria-label="Search destination" title="Search destination"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg></button>
     <div id="suggestDest" role="listbox" aria-label="Destination results"></div>
   </div>
   <div class="field" title="Buffer radius">
@@ -243,6 +266,7 @@
   function status(message, state='info') {
     selectionStatus.textContent=message; selectionStatus.dataset.state=state;
     selectionStatus.hidden=!message;
+    if (window.matchMedia && window.matchMedia('(max-width:560px)').matches) selectionStatus.style.top=(document.getElementById('searchBar').getBoundingClientRect().bottom+8)+'px';
   }
   function summary() { status([notes.home, notes.destination].filter(Boolean).join(' ')); }
   function invalidate(role) {
