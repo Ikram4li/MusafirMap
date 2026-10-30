@@ -1,0 +1,15 @@
+name = "musafirmap-geocoder"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# Route /api/geo/* on the existing domain to this Worker before merging.
+# Configure these from wrangler secret put; do not commit credentials.
+# GEO_CONTACT: a monitored contact email or project URL identifying this service.
+
+[[durable_objects.bindings]]
+name = "GEOCODER"
+class_name = "Geocoder"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Geocoder"]

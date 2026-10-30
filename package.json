@@ -1,0 +1,1 @@
+{"private":true,"scripts":{"test":"node --test map/tests/*.test.cjs && npm --prefix service test"},"devDependencies":{"@turf/turf":"6.5.0","jsdom":"^27.0.0","leaflet":"^1.9.4"}}

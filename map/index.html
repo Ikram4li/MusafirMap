@@ -104,6 +104,16 @@
     to { transform: translateX(28vw) translateY(-8px); }
   }
   @media (prefers-reduced-motion: reduce) { .loading-camel { animation: none; } }
+
+  #selectionStatus { position:absolute; z-index:1001; bottom:24px; left:10px;
+    max-width:min(440px,calc(100vw - 190px)); padding:12px; border-radius:8px;
+    background:white; color:#17251c; box-shadow:0 2px 10px #0003; font:14px system-ui; }
+  #selectionStatus[hidden] { display:none; }
+  #selectionStatus[data-state="error"] { border-left:4px solid #bd3030; }
+  .suggestion { display:block; width:100%; text-align:left; border:0; background:white; }
+  .suggestion:focus { outline:2px solid #1e90ff; outline-offset:-2px; }
+  #searchHome, #searchDest { margin-top:4px; }
+  @media(max-width:560px) { #selectionStatus { bottom:12px; max-width:calc(100vw - 195px); font-size:12px; } }
 </style>
 </head>
 <body>
@@ -125,11 +135,13 @@
   </div>
   <div class="field">
     <input type="text" id="homeInput" placeholder="Home City / Address / Postcode" autocomplete="off" spellcheck="false" />
-    <div id="suggestHome"></div>
+    <button id="searchHome" type="button">Search home</button>
+    <div id="suggestHome" role="listbox" aria-label="Home results"></div>
   </div>
   <div class="field">
     <input type="text" id="destInput" placeholder="Destination City / Address / Postcode" autocomplete="off" spellcheck="false" />
-    <div id="suggestDest"></div>
+    <button id="searchDest" type="button">Search destination</button>
+    <div id="suggestDest" role="listbox" aria-label="Destination results"></div>
   </div>
   <div class="field" title="Buffer radius">
     <input type="number" id="radiusInput" min="1" max="100" value="54.7" />
@@ -145,6 +157,7 @@
   </div>
 </div>
 
+<div id="selectionStatus" role="status" aria-live="polite" hidden></div>
 <div id="map"></div>
 
 <div id="boundaryLoading" role="status" aria-live="polite" aria-atomic="true" hidden>
@@ -167,9 +180,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Turf.js -->
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-<!-- Overpass JSON -> GeoJSON -->
-<script src="https://unpkg.com/osmtogeojson@2.1.0/osmtogeojson.js"></script>
 
+
+<script src="/map/resolver.js"></script>
 <script>
   // === Hamburger Menu ===
   const menuBtn = document.getElementById('menuBtn');
@@ -221,7 +234,23 @@
   const unitsSelect = document.getElementById('unitsSelect');
   const locateBtn   = document.getElementById('locateBtn');
 
-  let debounceH = null, debounceD = null;
+  const resolver = new MusafirResolver.Client();
+  const selectionStatus = document.getElementById('selectionStatus');
+  const versions = { home: 0, destination: 0 };
+  const selectedPlaces = { home: null, destination: null };
+  const notes = { home: '', destination: '' };
+  let locationVersion = 0;
+  function status(message, state='info') {
+    selectionStatus.textContent=message; selectionStatus.dataset.state=state;
+    selectionStatus.hidden=!message;
+  }
+  function summary() { status([notes.home, notes.destination].filter(Boolean).join(' ')); }
+  function invalidate(role) {
+    versions[role]++; selectedPlaces[role]=null; notes[role]='';
+    if(role==='home') {homeGeometry=null; homeBuffer=null; clearHomeLayers(); updateDestinationOverlap();}
+    else {destGeometry=null; destPinLatLng=null; clearDestLayers();}
+    summary();
+  }
 
   // ===== Boundary loading overlay =====
   const boundaryLoading = document.getElementById('boundaryLoading');
@@ -245,50 +274,6 @@
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       return await task();
     } finally { hideBoundaryLoading(); }
-  }
-
-  // ===== Nominatim Search / Reverse =====
-  async function searchNominatim(q) {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&polygon_geojson=1&limit=7&accept-language=en`;
-    const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
-    if (!resp.ok) throw new Error('Search failed');
-    return resp.json();
-  }
-
-  async function reverseNominatim(lat, lon) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&polygon_geojson=1&accept-language=en`;
-    const resp = await fetch(url, { headers: { 'User-Agent': 'city-boundary-demo' } });
-    if (!resp.ok) throw new Error('Reverse failed');
-    return resp.json();
-  }
-
-  // ===== Overpass helpers =====
-  async function fetchBoundaryByRelationId(osmId) {
-    const query = `
-[out:json][timeout:25];
-relation(${osmId});
-out body;
->;
-out skel qt;`;
-    const url = 'https://overpass-api.de/api/interpreter';
-    const resp = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
-    if (!resp.ok) throw new Error('Overpass API error');
-    const data = await resp.json();
-    return osmtogeojson(data);
-  }
-
-  async function fetchBoundaryByName(name) {
-    const query = `
-[out:json][timeout:25];
-relation["boundary"="administrative"]["name"="${name}"];
-out body;
->;
-out skel qt;`;
-    const url = 'https://overpass-api.de/api/interpreter';
-    const resp = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
-    if (!resp.ok) throw new Error('Overpass API error');
-    const data = await resp.json();
-    return osmtogeojson(data);
   }
 
   // ===== Helpers =====
@@ -328,94 +313,7 @@ out skel qt;`;
     if (b && b.isValid()) map.fitBounds(b.pad(0.2));
   }
 
-  function extractCityName(addr) {
-    if (!addr) return null;
-    return addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
-  }
-
-  // Classify destination specificity
-  function classifySpecificity(place) {
-    const t = (place.type || '').toLowerCase();
-    const cls = (place.class || '').toLowerCase();
-    const addt = (place.addresstype || '').toLowerCase();
-    if (t === 'postcode' || addt === 'postcode') return 'postcode';
-    const addressTypes = ['house','building','residential','yes','address','road','street','highway'];
-    if (addressTypes.includes(t) || cls === 'building' || cls === 'highway') return 'address';
-    return null;
-  }
-
-  // Resolve place nodes to their surrounding city, rather than relying on an
-  // exact global Overpass name match (city labels are often OSM points).
-  async function fetchNearbyCityBoundary(place) {
-    const cityName = extractCityName(place.address) || place.name;
-    const lat = Number(place.lat), lon = Number(place.lon);
-    if (!cityName || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    const normalise = name => (name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-    const cityKey = normalise(cityName);
-    // Some cities have a separate label node and an administrative outline,
-    // e.g. Glasgow -> Glasgow City. Do not widen to unrelated surrounding counties.
-    const aliases = [cityName];
-    for (const name of [place.address?.municipality, place.address?.county]) {
-      const key = normalise(name);
-      if (key && [cityKey, cityKey + ' city', 'city of ' + cityKey,
-          cityKey + ' city council', 'city of ' + cityKey + ' council'].includes(key) &&
-          !aliases.includes(name)) aliases.push(name);
-    }
-    const allowedNames = new Set(aliases.map(normalise));
-    for (const name of aliases) {
-      const params = new URLSearchParams({
-        format: 'jsonv2', q: name, addressdetails: '1',
-        polygon_geojson: '1', limit: '10', 'accept-language': 'en',
-        bounded: '1',
-        viewbox: [Math.max(-180, lon - 1), Math.min(90, lat + 1),
-                  Math.min(180, lon + 1), Math.max(-90, lat - 1)].join(',')
-      });
-      if (place.address?.country_code) params.set('countrycodes', place.address.country_code);
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-      try {
-        const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { signal: controller.signal });
-        if (!response.ok) throw new Error('City boundary search failed');
-        const candidates = await response.json();
-        const point = turf.point([lon, lat]);
-        for (const candidate of candidates) {
-          if (candidate.osm_type !== 'relation' ||
-              (candidate.class !== 'boundary' && candidate.category !== 'boundary')) continue;
-          const type = candidate.addresstype || candidate.type;
-          const cityBoundary = ['city', 'town', 'village', 'municipality', 'administrative'].includes(type);
-          const matchingAdministrativeArea = type === 'county' && allowedNames.has(normalise(candidate.name));
-          if (!cityBoundary && !matchingAdministrativeArea) continue;
-          const feature = { type: 'Feature', properties: {}, geometry: candidate.geojson };
-          if (isPolygonal(feature) && turf.booleanPointInPolygon(point, feature)) return feature;
-        }
-      } catch (e) { console.warn('City outline lookup failed:', e); }
-      finally { clearTimeout(timer); }
-    }
-    return null;
-  }
-
-  async function resolveGeometryFromPlace(place) {
-    if (place.geojson && ['Polygon', 'MultiPolygon'].includes(place.geojson.type)) {
-      return { type: 'Feature', properties: {}, geometry: place.geojson };
-    }
-    try {
-      const city = await fetchNearbyCityBoundary(place);
-      if (city) return city;
-    } catch (e) { console.warn('Nearby city boundary search failed:', e); }
-    if (place.osm_type === 'relation') {
-      try {
-        const gj = await fetchBoundaryByRelationId(place.osm_id);
-        const ownBoundary = gj.features.find(f =>
-          f.id === 'relation/' + place.osm_id && isPolygonal(f));
-        if (ownBoundary) return ownBoundary;
-      } catch (e) { console.warn('Relation fetch failed:', e); }
-    }
-    return turf.point([parseFloat(place.lon), parseFloat(place.lat)]);
-  }
-
-  function isPolygonal(feature) {
-    return feature && feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
-  }
+  const isPolygonal = MusafirResolver.polygonal;
 
   // Build a teardrop pin icon with black outline
   function createPinIcon(color) {
@@ -433,6 +331,11 @@ out skel qt;`;
       const pt = turf.point([destPinLatLng[1], destPinLatLng[0]]); // lon,lat
       const inside = turf.booleanPointInPolygon(pt, homeBuffer);
       const color = inside ? PIN_RED : PIN_GREEN;
+      const lines=turf.polygonToLine(homeBuffer);
+      const distance=Math.min(...(lines.type==='FeatureCollection'?lines.features:[lines]).map(line=>turf.pointToLineDistance(pt,line,{units:'kilometers'})));
+      if(distance<1 && selectedPlaces.destination?.precision!=='address') {
+        notes.destination='Destination pin is within 1 km of the threshold. A street/postcode centre may not represent your actual address.';
+      }
       destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon(color) }));
     } else {
       destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon('#333') }));
@@ -441,27 +344,13 @@ out skel qt;`;
   function addDestinationPinAt(lat, lon) { destPinLatLng = [lat, lon]; addDestinationPin(); }
 
   function drawHome(geom) {
-    clearHomeLayers();
-    homeGeometry = geom;
-
-    const { radius, units } = currentRadiusUnits();
-
-    if (isPolygonal(geom)) {
-      homeBoundaryLayer.addData(geom);
-      try {
-        homeBuffer = turf.buffer(geom, radius, { units });
-        homeBufferLayer.addData(homeBuffer);
-      } catch (e) { alert('Buffer error (home): ' + e.message); homeBuffer = null; }
-    } else {
-      const [lon, lat] = geom.geometry.coordinates;
-      homeMarkerLayer.addLayer(L.marker([lat, lon]));
-      try {
-        homeBuffer = turf.buffer(geom, radius, { units });
-        homeBufferLayer.addData(homeBuffer);
-      } catch (e) { alert('Buffer error (home point): ' + e.message); homeBuffer = null; }
-    }
-    updateDestinationOverlap();
-    fitToData();
+    const {radius,units}=currentRadiusUnits();
+    const buffer=turf.buffer(geom,radius,{units});
+    if(!isPolygonal(buffer))throw new Error('The home threshold could not be calculated.');
+    clearHomeLayers();homeGeometry=geom;homeBuffer=buffer;
+    if(isPolygonal(geom))homeBoundaryLayer.addData(geom);
+    else {const [lon,lat]=geom.geometry.coordinates;homeMarkerLayer.addLayer(L.marker([lat,lon]));}
+    homeBufferLayer.addData(homeBuffer);updateDestinationOverlap();fitToData();
   }
 
   function drawDestination(geom) {
@@ -478,6 +367,7 @@ out skel qt;`;
     destInsideLayer.clearLayers();
     destMarkerLayer.clearLayers();
     if (!destGeometry) return;
+    if(selectedPlaces.destination?.note)notes.destination=selectedPlaces.destination.note;
 
     // Precise destinations are pins only; the radius belongs to the home city.
     if (!isPolygonal(destGeometry)) {
@@ -493,90 +383,93 @@ out skel qt;`;
       const outside = turf.difference(destGeometry, homeBuffer);
       if (inside) destInsideLayer.addData(inside);
       if (outside) destOutsideLayer.addData(outside);
-    } catch (e) { console.warn('Destination overlap calculation failed:', e); }
+      if(inside && outside)notes.destination='The destination area straddles the threshold. Choose your actual address for a point result.';
+    } catch (e) { throw new Error('The destination outline loaded, but its overlap could not be calculated. No result is shown.'); }
   }
 
-  // ===== Suggestions UI =====
-  function renderSuggestions(container, places, onPick) {
-    container.innerHTML = '';
-    if (!places || !places.length) { container.style.display = 'none'; return; }
-    places.forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'suggestion';
-      div.textContent = p.display_name;
-      div.addEventListener('click', async () => {
-        container.style.display = 'none';
-        try {
-          await withBoundaryLoading(async () => {
-            let geom;
-            if (container === suggestDest && classifySpecificity(p)) {
-              geom = turf.point([parseFloat(p.lon), parseFloat(p.lat)]);
-            } else {
-              geom = await resolveGeometryFromPlace(p);
-              if (container === suggestDest && !isPolygonal(geom)) {
-                throw new Error('The city boundary could not be loaded. Please try again, or select a street, address or postcode for a precise destination pin.');
-              }
-            }
-            onPick(geom);
-          });
-        } catch (e) { alert('Failed to resolve selection: ' + e.message); console.error(e); }
+  // ===== Selection pipeline: choose identity -> resolve -> commit latest result =====
+  async function pickPlace(place, role) {
+    const version=++versions[role];
+    const container=role==='home'?suggestHome:suggestDest;
+    container.style.display='none';
+    try {
+      await withBoundaryLoading(async()=>{
+        const result=await resolver.resolve(place,role);
+        if(version!==versions[role])return;
+        const input=role==='home'?homeInput:destInput;
+        // Commit state only after successful resolution, including the visible label.
+        selectedPlaces[role]=result;
+        input.value=result.place.display_name || result.place.name;
+        notes[role]=result.precision==='home-circle'
+          ? 'Home outline unavailable: using an approximate circle from the selected point.'
+          : result.precision==='boundary'
+          ? (role==='home'?'Home':'Destination')+': '+(result.geometry.properties.name || result.place.name)+
+            ' ('+(result.geometry.properties.boundaryType || 'mapped')+' boundary; may differ from the built-up settlement).'
+          : 'Destination: '+(result.precision==='address'?'address pin.':'approximate '+result.precision+' centre pin; choose an exact address if close to the threshold.');
+        result.note=notes[role];
+        if(role==='home')drawHome(result.geometry);else drawDestination(result.geometry);
+        summary();
       });
-      container.appendChild(div);
-    });
-    container.style.display = 'block';
+    }catch(e){if(version===versions[role])status(e.message,'error');}
   }
-
-  // ===== Search Handlers =====
-  homeInput.addEventListener('input', () => {
-    const q = homeInput.value.trim();
-    if (debounceH) clearTimeout(debounceH);
-    if (q.length < 3) { suggestHome.style.display = 'none'; return; }
-    debounceH = setTimeout(async () => {
-      try { const res = await searchNominatim(q); renderSuggestions(suggestHome, res, drawHome); }
-      catch (e) { console.error(e); suggestHome.style.display = 'none'; }
-    }, 300);
+  function renderSuggestions(container, places, role) {
+    container.replaceChildren();
+    if(!places.length){container.style.display='none';status('No matching places found. Include the town and country.');return;}
+    places.forEach(p=>{
+      const button=document.createElement('button');button.type='button';
+      button.className='suggestion';button.setAttribute('role','option');
+      button.textContent=p.display_name+' — '+(p.kind==='area'?'area':p.kind==='unknown'?'unclassified':p.kind+' pin');
+      button.addEventListener('click',()=>pickPlace(p,role));container.appendChild(button);
+    });
+    container.style.display='block';
+  }
+  async function runSearch(role) {
+    const input=role==='home'?homeInput:destInput;
+    const container=role==='home'?suggestHome:suggestDest;
+    const q=input.value.trim();if(q.length<3){status('Enter at least three characters to search.');return;}
+    const version=++versions[role];
+    container.replaceChildren();container.style.display='none';
+    status('Searching…');
+    try {
+      const places=await resolver.search(q);
+      if(version!==versions[role])return;
+      status('Choose a result to confirm the location.');renderSuggestions(container,places,role);
+    }catch(e){if(version===versions[role])status(e.message,'error');}
+  }
+  for(const [role,input,container,button] of [
+    ['home',homeInput,suggestHome,document.getElementById('searchHome')],
+    ['destination',destInput,suggestDest,document.getElementById('searchDest')]
+  ]) {
+    input.addEventListener('input',()=>{invalidate(role);container.replaceChildren();container.style.display='none';});
+    input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runSearch(role);}if(e.key==='ArrowDown')container.querySelector('button')?.focus();});
+    button.addEventListener('click',()=>runSearch(role));
+    container.addEventListener('keydown',e=>{
+      const items=[...container.querySelectorAll('button')],i=items.indexOf(document.activeElement);
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}
+      if(e.key==='Escape'){container.style.display='none';input.focus();}
+    });
+  }
+  document.addEventListener('click',e=>{
+    if(!document.getElementById('searchBar').contains(e.target)){suggestHome.style.display='none';suggestDest.style.display='none';}
   });
-
-  destInput.addEventListener('input', () => {
-    const q = destInput.value.trim();
-    if (debounceD) clearTimeout(debounceD);
-    if (q.length < 3) { suggestDest.style.display = 'none'; return; }
-    debounceD = setTimeout(async () => {
-      try { const res = await searchNominatim(q); renderSuggestions(suggestDest, res, drawDestination); }
-      catch (e) { console.error(e); suggestDest.style.display = 'none'; }
-    }, 300);
-  });
-
-  // Hide suggestions when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!document.getElementById('searchBar').contains(e.target)) {
-      suggestHome.style.display = 'none';
-      suggestDest.style.display = 'none';
-    }
-  });
-
-  // ===== Locate Me (sets Home) =====
-  locateBtn.addEventListener('click', async () => {
-    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-    showBoundaryLoading();
-    locateBtn.disabled = true; locateBtn.textContent = 'Locating…';
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const lat = pos.coords.latitude, lon = pos.coords.longitude;
-        const rev = await reverseNominatim(lat, lon);
-        const placeLike = { lat: rev.lat || String(lat), lon: rev.lon || String(lon), osm_type: (rev.osm_type || '').toLowerCase(), osm_id: rev.osm_id, address: rev.address || {}, geojson: rev.geojson };
-        const geom = await resolveGeometryFromPlace(placeLike);
-        drawHome(geom);
-        homeInput.value = extractCityName(rev.address) || (rev.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-      } catch (e) { alert('Locate failed: ' + e.message); console.error(e); }
-      finally { hideBoundaryLoading(); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }
-    }, (err) => { hideBoundaryLoading(); alert('Geolocation error: ' + err.message); locateBtn.disabled = false; locateBtn.textContent = '📍 Locate Me (Home)'; }, { timeout: 20000 });
+  locateBtn.addEventListener('click',()=>{
+    if(!navigator.geolocation){status('Your browser does not support location access. Search for your home city.','error');return;}
+    invalidate('home');const version=versions.home,location=++locationVersion;
+    locateBtn.disabled=true;locateBtn.textContent='Locating…';showBoundaryLoading();
+    const finish=()=>{hideBoundaryLoading();if(location===locationVersion){locateBtn.disabled=false;locateBtn.textContent='📍 Locate Me (Home)';}};
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      try{
+        const place=await resolver.reverse(pos.coords.latitude,pos.coords.longitude);
+        if(version===versions.home)await pickPlace(place,'home');
+      }catch(e){if(version===versions.home)status(e.message,'error');}
+      finally{finish();}
+    },err=>{if(version===versions.home)status('Location access failed: '+err.message+'. You can search for your home city.','error');finish();},{timeout:20000});
   });
 
   // ===== Radius / Units change =====
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
-  radiusInput.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); } catch(e){ alert(e.message); } });
-  unitsSelect.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); } catch(e){ alert(e.message); } });
+  radiusInput.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); summary(); } catch(e){ status(e.message,'error'); } });
+  unitsSelect.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); summary(); } catch(e){ status(e.message,'error'); } });
 </script>
 </body>
 </html>
