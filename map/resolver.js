@@ -23,7 +23,7 @@
   }
   class Client {
     constructor({base='/api/geo', fetchImpl=globalThis.fetch, turf=globalThis.turf}={}) {
-      this.base=base; this.fetch=fetchImpl; this.turf=turf; this.cache=new Map(); this.pending=new Map();
+      this.base=base; this.fetch=fetchImpl.bind(globalThis); this.turf=turf; this.cache=new Map(); this.pending=new Map();
     }
     async request(action, params) {
       const key=action+'?'+new URLSearchParams(params);
