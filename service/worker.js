@@ -35,8 +35,7 @@ export class Geocoder {
         upstream=base+'/reverse?'+new URLSearchParams({...common,...coords(),zoom:'10',polygon_geojson:'1'});
       }else if(action==='parents'){
         const id=p.get('id');if(!/^\d+$/.test(id||''))throw Error('Invalid node ID');
-        upstream='https://overpass-api.de/api/interpreter';
-        options={method:'POST',body:new URLSearchParams({data:`[out:json][timeout:20];node(${id})->.label;rel(bn.label)["boundary"="administrative"];out body geom;`})};
+        upstream=`https://api.openstreetmap.org/api/0.6/node/${id}/relations.json`;
       }else return json({code:'invalid',message:'Unknown operation'},404);
     }catch(e){return json({code:'invalid',message:e.message},400);}
     const key=action+'?'+p.toString();
@@ -57,7 +56,22 @@ export class Geocoder {
         if(!response.ok)return json({code:response.status===429?'busy':'upstream',message:response.status===429?'The location provider is busy. Retry shortly.':'The boundary provider could not complete this request. Please retry.'},response.status===429?429:502);
         let data=await response.json();
         if(data.error)return json({code:'missing',message:'No mapped location was found here.'},404);
-        if(action==='parents')data=parentFeatures(data,Number(p.get('id')));
+        if(action==='parents'){
+          // Discover exact membership first, then fetch only those IDs' polygons.
+          // Do not depend on an Overpass query or guess a boundary from its name.
+          const relations=linkedRelations(data,Number(p.get('id')));
+          if(relations.length>20)return json({code:'ambiguous',message:'Too many linked boundaries for this city.'},422);
+          if(relations.length){
+            const lastLookup=await this.state.storage.get('lastRequest')||0;
+            await new Promise(r=>setTimeout(r,Math.max(0,lastLookup+1100-Date.now())));
+            await this.state.storage.put('lastRequest',Date.now());
+            const lookup=await fetch(base+'/lookup?'+new URLSearchParams({...common,osm_ids:relations.map(r=>'R'+r.id).join(','),polygon_geojson:'1'}),{signal:controller.signal,headers:{'User-Agent':`MusafirMap/2 (${this.env.GEO_CONTACT})`,'Accept':'application/json'}});
+            if(!lookup.ok)return json({code:lookup.status===429?'busy':'upstream',message:'The city outline provider could not complete this request. Please retry.'},lookup.status===429?429:502);
+            const rows=await lookup.json();
+            if(!Array.isArray(rows))throw Error('Invalid boundary response');
+            data=linkedFeatures(relations,rows);
+          }else data=[];
+        }
         // Brief shared in-memory cache also avoids duplicate submitted searches.
         // Address queries and reverse coordinates are never written to durable storage.
         if(this.responses.size>=100)this.responses.delete(this.responses.keys().next().value);
@@ -80,9 +94,11 @@ export class Geocoder {
   }
 }
 // Only relations explicitly linking this node as their city label/admin centre.
-// Overpass supplies geometry for member ways; preserve disconnected rings/holes.
-import osmtogeojson from 'osmtogeojson';
-export function parentFeatures(data,nodeId){
-  const ids=new Set((data.elements||[]).filter(e=>e.type==='relation'&&(e.members||[]).some(m=>m.type==='node'&&m.ref===nodeId&&['label','admin_centre'].includes(m.role))).map(e=>'relation/'+e.id));
-  return osmtogeojson(data).features.filter(f=>ids.has(f.id)&&['Polygon','MultiPolygon'].includes(f.geometry?.type)).map(f=>({...f,properties:{...f.properties,name:f.properties.name||'Administrative area',source:'OSM label/admin centre link',boundaryType:'administrative'}}));
+export function linkedRelations(data,nodeId){
+  if(!Array.isArray(data.elements))throw Error('Invalid membership response');
+  return data.elements.filter(e=>e.type==='relation'&&e.tags?.boundary==='administrative'&&(e.members||[]).some(m=>m.type==='node'&&m.ref===nodeId&&['label','admin_centre'].includes(m.role)));
+}
+export function linkedFeatures(relations,rows){
+  const ids=new Set(relations.map(r=>r.id));
+  return rows.filter(r=>r.osm_type==='relation'&&ids.has(r.osm_id)&&['Polygon','MultiPolygon'].includes(r.geojson?.type)).map(r=>({type:'Feature',geometry:r.geojson,properties:{name:r.name||'Administrative area',osmId:r.osm_id,source:'OSM label/admin centre link',boundaryType:'administrative'}}));
 }

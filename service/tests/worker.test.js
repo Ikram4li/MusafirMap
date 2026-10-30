@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {Geocoder,parentFeatures} from '../worker.js';
+import {Geocoder,linkedRelations,linkedFeatures} from '../worker.js';
 function storage(){const map=new Map();return {get:async k=>map.get(k),put:async(k,v)=>map.set(k,v),list:async()=>map,delete:async k=>map.delete(k),setAlarm:async()=>{}};}
 test('reject invalid IDs and unconfigured deployments before making requests',async()=>{
  const state={storage:storage()};
@@ -22,11 +22,35 @@ test('provider throttling remains a busy error, not a missing outline',async()=>
  const old=globalThis.fetch;globalThis.fetch=async()=>new Response('',{status:429});
  try{const r=await new Geocoder({storage:storage()},{GEO_CONTACT:'https://musafirmap.com'}).fetch(new Request('https://musafirmap.com/api/geo/search?q=Glasgow'));assert.equal(r.status,429);assert.equal((await r.json()).code,'busy');}finally{globalThis.fetch=old;}
 });
-test('reject relations that contain the node but do not link it as a city label',()=>{
- assert.deepEqual(parentFeatures({elements:[{type:'relation',id:1,tags:{boundary:'administrative'},members:[{type:'node',ref:2,role:''}]}]},2),[]);
+
+test('membership requires administrative boundary and explicit city link',()=>{
+ const relation={type:'relation',id:3,tags:{boundary:'administrative'},members:[{type:'node',ref:2,role:'admin_centre'}]};
+ assert.deepEqual(linkedRelations({elements:[relation]},2),[relation]);
+ assert.deepEqual(linkedRelations({elements:[relation]},99),[]);
+ assert.deepEqual(linkedRelations({elements:[{...relation,tags:{boundary:'protected_area'}}]},2),[]);
 });
-test('linked city label relation geometry is converted and keeps its provenance',()=>{
- const geometry=[{lat:0,lon:0},{lat:0,lon:2},{lat:2,lon:2},{lat:2,lon:0},{lat:0,lon:0}];
- const features=parentFeatures({elements:[{type:'relation',id:3,tags:{type:'multipolygon',boundary:'administrative',name:'Example City'},members:[{type:'node',ref:2,role:'admin_centre'},{type:'way',ref:5,role:'outer',geometry}]}]},2);
- assert.equal(features.length,1);assert.equal(features[0].geometry.type,'Polygon');assert.equal(features[0].properties.name,'Example City');assert.match(features[0].properties.source,/label/);
+test('city nodes resolve via exact membership IDs without Overpass',async()=>{
+ const old=globalThis.fetch,urls=[];
+ const geometry={type:'Polygon',coordinates:[[[0,0],[2,0],[2,2],[0,0]]]};
+ globalThis.fetch=async url=>{
+  urls.push(url);
+  if(url.includes('/relations.json'))return Response.json({elements:[{type:'relation',id:3,tags:{boundary:'administrative'},members:[{type:'node',ref:2,role:'admin_centre'}]}]});
+  assert.match(url,/osm_ids=R3/);
+  return Response.json([{osm_type:'relation',osm_id:3,name:'Example City',geojson:geometry},{osm_type:'relation',osm_id:999,geojson:geometry}]);
+ };
+ try{
+  const geo=new Geocoder({storage:storage()},{GEO_CONTACT:'https://musafirmap.com'});
+  const result=await geo.fetch(new Request('https://musafirmap.com/api/geo/parents?id=2'));
+  assert.equal(result.status,200);const rows=await result.json();assert.equal(rows.length,1);assert.equal(rows[0].properties.osmId,3);assert.deepEqual(rows[0].geometry,geometry);
+  await geo.fetch(new Request('https://musafirmap.com/api/geo/parents?id=2'));assert.equal(urls.length,2);
+ }finally{globalThis.fetch=old;}
+});
+test('linked polygon provider failure is retryable and never cached as missing',async()=>{
+ const old=globalThis.fetch;
+ globalThis.fetch=async url=>url.includes('/relations.json')?Response.json({elements:[{type:'relation',id:3,tags:{boundary:'administrative'},members:[{type:'node',ref:2,role:'label'}]}]}):new Response('',{status:503});
+ try{
+  const state={storage:storage()},geo=new Geocoder(state,{GEO_CONTACT:'https://musafirmap.com'});
+  const r=await geo.fetch(new Request('https://musafirmap.com/api/geo/parents?id=2'));
+  assert.equal(r.status,502);assert.equal((await r.json()).code,'upstream');assert.equal(await state.storage.get('parents?id=2'),undefined);
+ }finally{globalThis.fetch=old;}
 });
