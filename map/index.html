@@ -20,8 +20,6 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/images/musafir-map-logo-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/assets/images/musafir-map-logo-512.png">
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
   html, body { height: 100%; margin: 0; }
@@ -133,10 +131,13 @@
     #searchBar > .field:nth-child(4) { grid-column:2; grid-row:3; }
     #searchBar > .field:nth-child(5) { grid-column:3; grid-row:3; }
     #selectionStatus { bottom:auto; left:8px; right:8px; max-width:none; font-size:12px; padding:8px; }
-    #legend { bottom:24px; width:145px; font-size:11px; }
+    #legend { bottom:30px; width:145px; font-size:11px; }
     #legend h4 { font-size:12px; margin-bottom:4px; }
     .legend-item { margin:4px 0; gap:6px; }
   }
+  #destinationAutocomplete { min-width:0; width:100%; }
+  gmp-place-autocomplete { width:100%; color-scheme:light; }
+  .field { min-width:0; }
 </style>
 </head>
 <body>
@@ -162,8 +163,7 @@
     <div id="suggestHome" role="listbox" aria-label="Home results"></div>
   </div>
   <div class="field">
-    <input type="text" id="destInput" placeholder="Destination City / Address / Postcode" autocomplete="off" spellcheck="false" />
-    <button id="searchDest" type="button" aria-label="Search destination" title="Search destination"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg></button>
+    <div id="destinationAutocomplete"></div>
     <div id="suggestDest" role="listbox" aria-label="Destination results"></div>
   </div>
   <div class="field" title="Buffer radius">
@@ -196,17 +196,21 @@
   <div class="legend-item"><span class="color-box home-buffer"></span>Traveller’s Threshold</div>
   <div class="legend-item"><span class="color-box dest-inside"></span>Non Traveller</div>
   <div class="legend-item"><span class="color-box dest-outside"></span>Traveller</div>
-  <div class="point-note">Home boundary unavailable: a circle is used. Destination cities use outlines; addresses and postcodes use pins.</div>
+  <div class="point-note">City outlines: OpenStreetMap. Places and addresses use pins. Choose a home before interpreting colours.</div>
 </div>
 
-<!-- Leaflet -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Turf.js -->
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
 
 <script src="/map/resolver.js?v=fetch-binding-1"></script>
+<script src="/map/google-destination.js?v=1"></script>
+<script src="/map/google-config.js"></script>
 <script>
+window.initMusafirGoogle = async function () {
+  try {
+  const {Map: GoogleMap, Data} = await google.maps.importLibrary("maps");
+  const {PlaceAutocompleteElement} = await google.maps.importLibrary("places");
   // === Hamburger Menu ===
   const menuBtn = document.getElementById('menuBtn');
   const menuDropdown = document.getElementById('menuDropdown');
@@ -224,20 +228,22 @@
   });
 
   // ===== Map Setup =====
-  const map = L.map('map', { zoomControl: false }).setView([53.795, -1.759], 10);
-  L.control.zoom({ position: 'bottomleft' }).addTo(map);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // ===== Layers =====
-  const homeBoundaryLayer = L.geoJSON(null, { style: { color: '#000', weight: 3, fillOpacity: 0.15 } }).addTo(map);
-  const homeBufferLayer   = L.geoJSON(null, { style: { color: '#1e90ff', weight: 3, fillOpacity: 0.10 } }).addTo(map);
-  const homeMarkerLayer   = L.layerGroup().addTo(map);
-
-  const destOutsideLayer  = L.geoJSON(null, { style: { color: '#2ecc71', weight: 3, fillOpacity: 0.15 } }).addTo(map);
-  const destInsideLayer   = L.geoJSON(null, { style: { color: '#e74c3c', weight: 3, fillOpacity: 0.15 } }).addTo(map);
-  const destMarkerLayer   = L.layerGroup().addTo(map);
+  const map = new GoogleMap(document.getElementById('map'), {
+    center:{lat:53.795,lng:-1.759}, zoom:10, mapTypeControl:false,
+    streetViewControl:false, fullscreenControl:false,
+    zoomControlOptions:{position:google.maps.ControlPosition.LEFT_BOTTOM}
+  });
+  function layer(color,fillOpacity=.15,zIndex=1) {
+    const data=new Data({map});
+    data.setStyle(feature=>({strokeColor:color,strokeWeight:3,fillColor:color,fillOpacity,zIndex,
+      clickable:false,icon:{path:'M0,0 C-3,-5 -10,-13 -10,-20 A10,10 0 1,1 10,-20 C10,-13 3,-5 0,0 Z',
+      fillColor:feature.getProperty('color')||color,fillOpacity:1,strokeColor:'#000',strokeWeight:1.5,scale:1}}));
+    return {clearLayers(){data.forEach(f=>data.remove(f));},addData(f){data.addGeoJson(f);}};
+  }
+  const homeBoundaryLayer=layer('#000',.15,2),homeBufferLayer=layer('#1e90ff',.10,1);
+  const homeMarkerLayer=layer('#000',1,5);
+  const destOutsideLayer=layer('#2ecc71',.15,3),destInsideLayer=layer('#e74c3c',.15,3);
+  const destMarkerLayer=layer('#333',1,6);
 
   // ===== State =====
   let homeGeometry = null;   // Feature (Polygon/MultiPolygon) OR Point
@@ -250,7 +256,11 @@
   const PIN_RED   = '#c0392b';
 
   const homeInput = document.getElementById('homeInput');
-  const destInput = document.getElementById('destInput');
+  const destinationAutocomplete = new PlaceAutocompleteElement();
+  destinationAutocomplete.placeholder='Place, business, address or postcode';
+  destinationAutocomplete.setAttribute('aria-label','Search destination');
+  document.getElementById('destinationAutocomplete').appendChild(destinationAutocomplete);
+  map.addListener('idle',()=>{const b=map.getBounds();if(b)destinationAutocomplete.locationBias=b;});
   const suggestHome = document.getElementById('suggestHome');
   const suggestDest = document.getElementById('suggestDest');
   const radiusInput = document.getElementById('radiusInput');
@@ -306,7 +316,9 @@
     homeBufferLayer.clearLayers();
     homeMarkerLayer.clearLayers();
   }
+  let pendingNeutral=null;
   function clearDestLayers() {
+    if(pendingNeutral){pendingNeutral.clearLayers();pendingNeutral=null;}
     destOutsideLayer.clearLayers();
     destInsideLayer.clearLayers();
     destMarkerLayer.clearLayers();
@@ -319,35 +331,17 @@
     return { radius, units };
   }
 
-  function collectBounds() {
-    const groups = [];
-    if (homeBoundaryLayer.getLayers().length) groups.push(homeBoundaryLayer);
-    if (homeBufferLayer.getLayers().length)   groups.push(homeBufferLayer);
-    if (destOutsideLayer.getLayers().length)  groups.push(destOutsideLayer);
-    if (destInsideLayer.getLayers().length)   groups.push(destInsideLayer);
-    if (homeMarkerLayer.getLayers().length)   groups.push(homeMarkerLayer);
-    if (destMarkerLayer.getLayers().length)   groups.push(destMarkerLayer);
-    if (!groups.length) return null;
-    const fg = L.featureGroup(groups.flatMap(g => g.getLayers ? g.getLayers() : [g]));
-    return fg.getBounds();
-  }
-
   function fitToData() {
-    const b = collectBounds();
-    if (b && b.isValid()) map.fitBounds(b.pad(0.2));
+    const geometries=[homeGeometry,homeBuffer,destGeometry].filter(Boolean);
+    if(!geometries.length)return;
+    const [west,south,east,north]=turf.bbox(turf.featureCollection(geometries));
+    if(west===east && south===north){map.setCenter({lat:south,lng:west});map.setZoom(16);return;}
+    map.fitBounds({west,south,east,north},{top:document.getElementById('searchBar').offsetHeight+30,left:24,right:24,bottom:60});
   }
 
   const isPolygonal = MusafirResolver.polygonal;
 
-  // Build a teardrop pin icon with black outline
-  function createPinIcon(color) {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="38" viewBox="0 0 26 38">
-        <path d="M13 1C6.1 1 1 6.3 1 13.2c0 8.4 9.1 18.1 12 24.9 2.9-6.8 12-16.5 12-24.9C25 6.3 19.9 1 13 1z" fill="${color}" stroke="#000" stroke-width="2"/>
-        <circle cx="13" cy="13" r="4.2" fill="#fff" stroke="#000" stroke-width="2"/>
-      </svg>`;
-    return L.divIcon({ html: svg, className: 'pin-icon', iconSize: [26, 38], iconAnchor: [13, 36] });
-  }
+  function pinFeature(latLng,color){return turf.point([latLng[1],latLng[0]],{color});}
 
   function addDestinationPin() {
     if (!destPinLatLng) return;
@@ -358,11 +352,11 @@
       const lines=turf.polygonToLine(homeBuffer);
       const distance=Math.min(...(lines.type==='FeatureCollection'?lines.features:[lines]).map(line=>turf.pointToLineDistance(pt,line,{units:'kilometers'})));
       if(distance<1 && selectedPlaces.destination?.precision!=='address') {
-        notes.destination='Destination pin is within 1 km of the threshold. A street/postcode centre may not represent your actual address.';
+        notes.destination='Destination pin is within 1 km of the threshold. Confirm the exact location: venue, street and postcode coordinates may represent a centre rather than the entrance.';
       }
-      destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon(color) }));
+      destMarkerLayer.addData(pinFeature(destPinLatLng,color));
     } else {
-      destMarkerLayer.addLayer(L.marker(destPinLatLng, { icon: createPinIcon('#333') }));
+      destMarkerLayer.addData(pinFeature(destPinLatLng,'#333'));
     }
   }
   function addDestinationPinAt(lat, lon) { destPinLatLng = [lat, lon]; addDestinationPin(); }
@@ -373,7 +367,7 @@
     if(!isPolygonal(buffer))throw new Error('The home threshold could not be calculated.');
     clearHomeLayers();homeGeometry=geom;homeBuffer=buffer;
     if(isPolygonal(geom))homeBoundaryLayer.addData(geom);
-    else {const [lon,lat]=geom.geometry.coordinates;homeMarkerLayer.addLayer(L.marker([lat,lon]));}
+    else {const [lon,lat]=geom.geometry.coordinates;homeMarkerLayer.addData(pinFeature([lat,lon],'#000'));}
     homeBufferLayer.addData(homeBuffer);updateDestinationOverlap();fitToData();
   }
 
@@ -387,6 +381,7 @@
   }
 
   function updateDestinationOverlap() {
+    if(pendingNeutral){pendingNeutral.clearLayers();pendingNeutral=null;}
     destOutsideLayer.clearLayers();
     destInsideLayer.clearLayers();
     destMarkerLayer.clearLayers();
@@ -399,7 +394,9 @@
       return;
     }
     if (!homeBuffer) {
-      destOutsideLayer.addData(destGeometry);
+      const neutral=layer('#777',.12,3);
+      // Reuse a dedicated neutral layer until a home threshold is available.
+      neutral.addData(destGeometry);pendingNeutral=neutral;
       return;
     }
     try {
@@ -420,10 +417,10 @@
       await withBoundaryLoading(async()=>{
         const result=await resolver.resolve(place,role);
         if(version!==versions[role])return;
-        const input=role==='home'?homeInput:destInput;
+        const input=role==='home'?homeInput:null;
         // Commit state only after successful resolution, including the visible label.
         selectedPlaces[role]=result;
-        input.value=result.place.display_name || result.place.name;
+        if(input)input.value=result.place.display_name || result.place.name;
         notes[role]=result.precision==='home-circle'
           ? 'Home outline unavailable: using an approximate circle from the selected point.'
           : result.precision==='boundary'
@@ -448,7 +445,7 @@
     container.style.display='block';
   }
   async function runSearch(role) {
-    const input=role==='home'?homeInput:destInput;
+    const input=homeInput;
     const container=role==='home'?suggestHome:suggestDest;
     const q=input.value.trim();if(q.length<3){status('Enter at least three characters to search.');return;}
     const version=++versions[role];
@@ -461,8 +458,7 @@
     }catch(e){if(version===versions[role])status(e.message,'error');}
   }
   for(const [role,input,container,button] of [
-    ['home',homeInput,suggestHome,document.getElementById('searchHome')],
-    ['destination',destInput,suggestDest,document.getElementById('searchDest')]
+    ['home',homeInput,suggestHome,document.getElementById('searchHome')]
   ]) {
     input.addEventListener('input',()=>{invalidate(role);container.replaceChildren();container.style.display='none';});
     input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runSearch(role);}if(e.key==='ArrowDown')container.querySelector('button')?.focus();});
@@ -473,6 +469,42 @@
       if(e.key==='Escape'){container.style.display='none';input.focus();}
     });
   }
+  // Invalidate immediately on typing so an older details response cannot win.
+  destinationAutocomplete.addEventListener('input',()=>{
+    invalidate('destination');suggestDest.replaceChildren();suggestDest.style.display='none';
+  });
+  destinationAutocomplete.addEventListener('gmp-error',()=>status('Google place search is unavailable. Check the API setup or retry.','error'));
+  destinationAutocomplete.addEventListener('gmp-select',async ({placePrediction})=>{
+    invalidate('destination');const version=versions.destination;
+    suggestDest.replaceChildren();suggestDest.style.display='none';
+    status('Loading destination…');
+    try {
+      const place=placePrediction.toPlace();
+      await place.fetchFields({fields:['location','types','formattedAddress']});
+      if(version!==versions.destination)return;
+      const precision=GoogleDestination.kind(place.types);
+      const geometry=GoogleDestination.point(place);
+      const name=placePrediction.mainText?.toString()||place.formattedAddress?.split(',')[0]||'Selected place';
+      if(precision==='unknown')throw Error('This result has an unknown place type. Choose a named venue, address or city.');
+      if(precision==='area') {
+        // Google identifies the area; the user confirms an OSM boundary result.
+        // Never convert Google's rectangular viewport into a polygon.
+        status('Finding mapped outlines. Confirm the matching area below.');
+        const rows=await resolver.search(place.formattedAddress||name);
+        if(version!==versions.destination)return;
+        const areas=rows.filter(p=>p.kind==='area');
+        if(!areas.length)throw Error('No matching mapped area was found. Choose a venue or address instead.');
+        renderSuggestions(suggestDest,areas,'destination');
+        status('Select the matching mapped area to load its outline.');
+        return;
+      }
+      selectedPlaces.destination={place:{name},geometry,precision,
+        note:'Destination: '+name+(place.formattedAddress?' — '+place.formattedAddress:'')+'. '+
+        (precision==='poi'?'Place pin; check the position near the threshold.':'Approximate '+precision+' pin; check the position near the threshold.')};
+      notes.destination=selectedPlaces.destination.note;
+      drawDestination(geometry);summary();
+    }catch(e){if(version===versions.destination)status(e.message||'Destination lookup failed. Please retry.','error');}
+  });
   document.addEventListener('click',e=>{
     if(!document.getElementById('searchBar').contains(e.target)){suggestHome.style.display='none';suggestDest.style.display='none';}
   });
@@ -494,6 +526,19 @@
   function recomputeAll() { if (homeGeometry) { drawHome(homeGeometry); } if (destGeometry) { drawDestination(destGeometry); } }
   radiusInput.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); summary(); } catch(e){ status(e.message,'error'); } });
   unitsSelect.addEventListener('change', async () => { try { await withBoundaryLoading(recomputeAll); summary(); } catch(e){ status(e.message,'error'); } });
+  } catch(error) {
+    const box=document.getElementById('selectionStatus');box.hidden=false;box.dataset.state='error';
+    box.textContent='Map could not start. Check Google Maps API setup and reload.';
+    console.error('Map startup failed',error);
+  }
+};
+window.gm_authFailure=function(){const box=document.getElementById('selectionStatus');box.hidden=false;box.dataset.state='error';box.textContent='Google Maps could not authorise this website. Check the allowed website addresses, enabled APIs and billing.';};
+const googleScript=document.createElement('script');
+googleScript.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(window.MUSAFIR_GOOGLE_KEY)+'&loading=async&v=quarterly&callback=initMusafirGoogle';
+googleScript.async=true;
+googleScript.onerror=()=>{const box=document.getElementById('selectionStatus');box.hidden=false;box.textContent='Google Maps could not load. Check your connection and reload.';};
+document.head.appendChild(googleScript);
 </script>
 </body>
 </html>
+
