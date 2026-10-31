@@ -1,68 +1,53 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const {JSDOM}=require('jsdom'),turf=require('@turf/turf');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
-const inline=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).filter(Boolean).join('\n');
-const pause=ms=>new Promise(r=>setTimeout(r,ms));
-async function until(fn){for(let n=0;n<150;n++){if(fn())return;await pause(10);}throw Error('UI did not settle');}
-const home={osm_type:'relation',osm_id:1,lat:53.8,lon:-1.75,name:'Bradford',display_name:'Bradford, UK',addresstype:'city',geojson:turf.bboxPolygon([-1.85,53.7,-1.65,53.9]).geometry};
-const city={osm_type:'node',osm_id:2,lat:55.86,lon:-4.25,name:'Glasgow',display_name:'Glasgow, Scotland, UK',addresstype:'city',address:{city:'Glasgow',country_code:'gb'}};
-const glasgow={...turf.bboxPolygon([-4.4,55.75,-4.1,55.98]),properties:{name:'Glasgow City',boundaryType:'administrative'}};
-function setup(handler){
- const dom=new JSDOM(html,{url:'https://www.musafirmap.com/map/',runScripts:'outside-only',pretendToBeVisual:true});
- const w=dom.window;w.turf=turf;w.fetch=async url=>handler(url);w.AbortController=globalThis.AbortController;
- w.alert=()=>{throw Error('No modal alerts expected');};
- w.eval(fs.readFileSync(require.resolve('leaflet/dist/leaflet-src.js'),'utf8'));w.L.Browser.svg=true;
- w.eval(fs.readFileSync(path.join(__dirname,'../resolver.js'),'utf8'));w.eval(inline+"\nwindow.testRead = expression => eval(expression);");
- return {w,dom,el:id=>w.document.getElementById(id)};
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {JSDOM}=require('jsdom');
+const turf=require('@turf/turf');
+const {kind,point}=require('../google-destination.js');
+test('POIs, streets and postcodes are pins; political areas are outlines; unknown types fail closed',()=>{
+ for(const t of ['mosque','gym','restaurant','store'])assert.equal(kind([t,'point_of_interest','establishment']),'poi');
+ assert.equal(kind(['postal_code']),'postcode');assert.equal(kind(['route']),'street');
+ for(const t of ['locality','postal_town','administrative_area_level_2','country'])assert.equal(kind([t,'political']),'area');
+ assert.equal(kind([]),'unknown');
+ assert.throws(()=>point({location:{lat:NaN,lng:1}}));
+ assert.equal(point({location:{lat:1,lng:2},viewport:{}}).geometry.type,'Point');
+});
+async function setup(){
+ const dom=new JSDOM(fs.readFileSync(__dirname+'/../index.html','utf8'),{url:'https://musafirmap.com/map/',runScripts:'outside-only',pretendToBeVisual:true});
+ const w=dom.window;w.turf=turf;w.AbortController=AbortController;w.URLSearchParams=URLSearchParams;const layers=[];
+ class Data{constructor(){this.rows=[];layers.push(this);}setStyle(fn){this.style=fn;}addGeoJson(f){this.rows.push(f);}forEach(fn){[...this.rows].forEach(fn);}remove(f){this.rows=this.rows.filter(x=>x!==f);}}
+ class Map{addListener(){}getBounds(){return null;}fitBounds(){}setCenter(){}setZoom(){}}
+ class Places extends w.HTMLElement{}
+ w.customElements.define('mock-places',Places);
+ w.google={maps:{importLibrary:async n=>n==='maps'?{Map,Data}:{PlaceAutocompleteElement:Places},ControlPosition:{LEFT_BOTTOM:1}}};
+ const boundary=turf.polygon([[[-1,-1],[1,-1],[1,1],[-1,1],[-1,-1]]]);
+ const home={osm_type:'relation',osm_id:1,lat:'0',lon:'0',name:'Home',display_name:'Home',addresstype:'city',geojson:boundary.geometry};
+ const calls=[];w.fetch=async url=>{calls.push(url);return Response.json(url.includes('/search')?[home]:home);};
+ w.eval(fs.readFileSync(__dirname+'/../resolver.js','utf8'));w.eval(fs.readFileSync(__dirname+'/../google-destination.js','utf8'));
+ for(const m of dom.serialize().matchAll(/<script>([\s\S]*?)<\/script>/g))w.eval(m[1]);
+ await w.initMusafirGoogle();
+ const widget=w.document.querySelector('mock-places');
+ async function pick(types,lat,lng){const e=new w.Event('gmp-select');e.placePrediction={mainText:{toString:()=> 'Test venue'},toPlace:()=>({types,location:{lat:()=>lat,lng:()=>lng},formattedAddress:'Test place',fetchFields:async()=>{}})};widget.dispatchEvent(e);await tick();}
+ return {dom,w,layers,calls,widget,pick};
 }
-async function choose(ui,role,q){const input=ui.el(role==='home'?'homeInput':'destInput');input.value=q;input.dispatchEvent(new ui.w.Event('input'));ui.el(role==='home'?'searchHome':'searchDest').click();const id=role==='home'?'suggestHome':'suggestDest';await until(()=>ui.el(id).querySelector('button'));ui.el(id).querySelector('button').click();await until(()=>ui.el('boundaryLoading').hidden);}
-test('full page selection: explicit search, city outline, address pin, radius changes and input invalidation',async()=>{
- const urls=[];const ui=setup(async url=>{urls.push(url);const action=url.split('/').pop().split('?')[0],q=new URL(url,'https://x').searchParams.get('q');return Response.json(action==='search'?[q==='Bradford'?home:q==='Glasgow'?city:{...city,osm_id:3,addresstype:'postcode',name:'G1 1AA',display_name:'G1 1AA',lat:55.86,lon:-4.25}]:action==='parents'?[glasgow]:[]);});
- try{
-  ui.el('destInput').value='Glasgow';ui.el('destInput').dispatchEvent(new ui.w.Event('input'));await pause(350);assert.equal(urls.length,0,'typing must not call Nominatim');
-  await choose(ui,'home','Bradford');await choose(ui,'destination','Glasgow');
-  assert.equal(ui.w.testRead('destGeometry.geometry.type'),'Polygon');assert.equal(ui.w.testRead('destMarkerLayer.getLayers().length'),0);assert.match(ui.el('selectionStatus').textContent,/Glasgow City/);
-  await choose(ui,'destination','G1 1AA');assert.equal(ui.w.testRead('destGeometry.geometry.type'),'Point');assert.equal(ui.w.testRead('destOutsideLayer.getLayers().length+destInsideLayer.getLayers().length'),0);assert.equal(ui.w.testRead('destMarkerLayer.getLayers().length'),1);
-  ui.el('radiusInput').value='40';ui.el('radiusInput').dispatchEvent(new ui.w.Event('change'));await until(()=>ui.el('boundaryLoading').hidden);assert.equal(ui.w.testRead('destOutsideLayer.getLayers().length+destInsideLayer.getLayers().length'),0);
-  ui.el('destInput').value='Different';ui.el('destInput').dispatchEvent(new ui.w.Event('input'));assert.equal(ui.w.testRead('destGeometry'),null);assert.equal(ui.w.testRead('destMarkerLayer.getLayers().length'),0);
- }finally{ui.dom.window.close();}
+const tick=()=>new Promise(r=>setTimeout(r,60));
+test('POI selection draws neutral then inside/outside pins after home lookup; edits clear results',async()=>{
+ const a=await setup();try{
+ await a.pick(['mosque','point_of_interest'],0,0);
+ assert.equal(a.layers[5].rows[0].properties.color,'#333');assert.equal(a.calls.length,0);
+ const input=a.w.document.getElementById('homeInput');input.value='Home';a.w.document.getElementById('searchHome').click();await tick();
+ a.w.document.querySelector('#suggestHome button').click();await tick();
+ assert.equal(a.layers[5].rows[0].properties.color,'#c0392b');
+ await a.pick(['gym','establishment'],10,10);assert.equal(a.layers[5].rows[0].properties.color,'#27ae60');
+ a.widget.dispatchEvent(new a.w.Event('input'));assert.equal(a.layers[5].rows.length,0);
+ }finally{a.dom.window.close();}
 });
-test('late search responses cannot replace newer suggestions',async()=>{
- let release;const slow=new Promise(r=>release=r);
- const ui=setup(async url=>{const q=new URL(url,'https://x').searchParams.get('q');if(q==='Older')return slow;return Response.json([city]);});
- try{
-  ui.el('destInput').value='Older';ui.el('searchDest').click();ui.el('destInput').value='Newer';ui.el('destInput').dispatchEvent(new ui.w.Event('input'));ui.el('searchDest').click();await until(()=>ui.el('suggestDest').querySelector('button'));
-  release(Response.json([home]));await pause(50);assert.match(ui.el('suggestDest').textContent,/Glasgow/);assert.doesNotMatch(ui.el('suggestDest').textContent,/Bradford/);
- }finally{ui.dom.window.close();}
+test('city selection requests boundary choices without drawing a viewport or pin',async()=>{
+ const a=await setup();try{await a.pick(['locality','political'],0,0);assert.equal(a.calls.length,1);assert.equal(a.layers[5].rows.length,0);assert.ok(a.w.document.querySelector('#suggestDest button'));}finally{a.dom.window.close();}
 });
-test('lookup failure leaves a clear inline error and dismisses loading overlay',async()=>{
- const ui=setup(async url=>url.includes('/search?')?Response.json([city]):Response.json({code:'busy',message:'Provider busy; retry shortly.'},{status:429}));
- try{await choose(ui,'destination','Glasgow');assert.match(ui.el('selectionStatus').textContent,/Provider busy/);assert.equal(ui.el('selectionStatus').dataset.state,'error');assert.equal(ui.w.testRead('destGeometry'),null);}finally{ui.dom.window.close();}
-});
-test('a slow boundary selection cannot overwrite a newer precise destination',async()=>{
- let release;const slow=new Promise(r=>release=r);
- const ui=setup(async url=>{if(url.includes('/parents?'))return slow;return Response.json([city]);});
- try{
-  const p1=ui.w.testRead('pickPlace') (city,'destination');
-  await pause(30);
-  const p2=ui.w.testRead('pickPlace') ({...city,osm_id:4,addresstype:'postcode'},'destination');await p2;
-  release(Response.json([glasgow]));await p1;
-  assert.equal(ui.w.testRead('destGeometry.geometry.type'),'Point');assert.equal(ui.w.testRead('selectedPlaces.destination.place.osm_id'),4);assert.equal(ui.el('boundaryLoading').hidden,true);
- }finally{ui.dom.window.close();}
-});
-test('area overlaps are recalculated on units changes; home edits remove the old threshold',async()=>{
- const near={...home,osm_id:5,name:'Nearby',display_name:'Nearby area',geojson:turf.bboxPolygon([-2,53.5,0,54]).geometry};
- const ui=setup(async url=>Response.json([home]));
- try{
-  await ui.w.testRead('pickPlace')(home,'home');await ui.w.testRead('pickPlace')(near,'destination');
-  assert.ok(ui.w.testRead('destInsideLayer.getLayers().length')>0);assert.ok(ui.w.testRead('destOutsideLayer.getLayers().length')>0);assert.match(ui.el('selectionStatus').textContent,/straddles/);
-  ui.el('unitsSelect').value='kilometers';ui.el('unitsSelect').dispatchEvent(new ui.w.Event('change'));await until(()=>ui.el('boundaryLoading').hidden);
-  assert.equal(ui.w.testRead('destMarkerLayer.getLayers().length'),0);
-  ui.el('homeInput').dispatchEvent(new ui.w.Event('input'));assert.equal(ui.w.testRead('homeBuffer'),null);assert.equal(ui.w.testRead('destInsideLayer.getLayers().length'),0);
- }finally{ui.dom.window.close();}
-});
-test('GPS denial closes loading and offers manual search',async()=>{
- const ui=setup(async()=>Response.json([]));
- Object.defineProperty(ui.w.navigator,'geolocation',{value:{getCurrentPosition:(ok,fail)=>fail({message:'Permission denied'})}});
- try{ui.el('locateBtn').click();assert.equal(ui.el('boundaryLoading').hidden,true);assert.equal(ui.el('locateBtn').disabled,false);assert.match(ui.el('selectionStatus').textContent,/Permission denied/);}finally{ui.dom.window.close();}
+test('typing cancels a pending Google details result',async()=>{
+ const a=await setup();try{
+ let finish;const wait=new Promise(r=>finish=r);const e=new a.w.Event('gmp-select');
+ e.placePrediction={toPlace:()=>({types:['establishment'],location:{lat:()=>0,lng:()=>0},fetchFields:()=>wait})};
+ a.widget.dispatchEvent(e);a.widget.dispatchEvent(new a.w.Event('input'));finish();await tick();assert.equal(a.layers[5].rows.length,0);
+ }finally{a.dom.window.close();}
 });
